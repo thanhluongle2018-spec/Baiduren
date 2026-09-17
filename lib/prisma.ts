@@ -1,8 +1,10 @@
+import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/lib/generated/prisma/client";
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
+  pgPool?: Pool;
 };
 
 function createPrismaClient() {
@@ -11,8 +13,9 @@ function createPrismaClient() {
     throw new Error("DATABASE_URL is not set. Copy .env.example to .env.");
   }
 
-  const adapter = new PrismaPg(url);
-  return new PrismaClient({ adapter });
+  const pool = globalForPrisma.pgPool ?? new Pool({ connectionString: url });
+  globalForPrisma.pgPool = pool;
+  return new PrismaClient({ adapter: new PrismaPg(pool) });
 }
 
 export function getPrisma() {

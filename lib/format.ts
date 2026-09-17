@@ -4,8 +4,29 @@ const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
   timeZone: "Asia/Shanghai",
 });
 
-export function formatDateTime(value: string) {
+export function formatDateTime(value: string | null | undefined) {
+  if (!value) return "—";
   return dateFormatter.format(new Date(value));
+}
+
+export function formatStatus(status: string) {
+  switch (status) {
+    case "PENDING":
+      return "等待中";
+    case "QUEUED":
+      return "排队中";
+    case "RUNNING":
+      return "测速中";
+    case "SUCCESS":
+    case "COMPLETED":
+      return "成功";
+    case "FAILED":
+      return "失败";
+    case "CANCELLED":
+      return "已取消";
+    default:
+      return status;
+  }
 }
 
 export function formatLatency(ms: number) {

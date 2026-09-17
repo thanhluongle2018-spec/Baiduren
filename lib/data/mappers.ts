@@ -9,6 +9,7 @@ import type {
   PromotionRecord,
   ReviewRecord,
   SpeedTestRecord,
+  SpeedTestResultView,
 } from "@/types";
 
 type DecimalLike = unknown;
@@ -78,28 +79,78 @@ type DbPromotion = {
   airport?: { name: string } | null;
 };
 
+type DbResult = {
+  latencyMs: DecimalLike;
+  minLatencyMs?: DecimalLike;
+  maxLatencyMs?: DecimalLike;
+  downloadMbps: DecimalLike;
+  downloadSingleMbps?: DecimalLike;
+  downloadMultiMbps?: DecimalLike;
+  uploadMbps: DecimalLike;
+  uploadSingleMbps?: DecimalLike;
+  uploadMultiMbps?: DecimalLike;
+  packetLoss: DecimalLike;
+  packetLossPercent?: DecimalLike;
+  successRate: DecimalLike;
+  successRatePercent?: DecimalLike;
+  stability: DecimalLike;
+  singleThread?: boolean;
+  testedAt: Date;
+  isDemo?: boolean;
+};
+
 type DbSpeedTest = {
   id: string;
   airportId: string;
   nodeId: string | null;
+  serverId?: string | null;
   status: SpeedTestRecord["status"];
   mode: SpeedTestRecord["mode"];
+  concurrency?: number;
   region: string;
   startedAt: Date | null;
   finishedAt: Date | null;
+  errorMessage?: string | null;
+  isDemo?: boolean;
   airport?: { name: string; slug: string } | null;
   node?: { name: string } | null;
-  server?: { name: string } | null;
-  result?: {
-    latencyMs: DecimalLike;
-    downloadMbps: DecimalLike;
-    uploadMbps: DecimalLike;
-    packetLoss: DecimalLike;
-    successRate: DecimalLike;
-    stability: DecimalLike;
-    testedAt: Date;
-  } | null;
+  server?: { id?: string; name: string } | null;
+  result?: DbResult | null;
 };
+
+export function mapResultMetrics(result: DbResult): SpeedTestResultView {
+  const latencyMs = toNumber(result.latencyMs);
+  const downloadMbps = toNumber(result.downloadMbps);
+  const uploadMbps = toNumber(result.uploadMbps);
+  const packetLoss = toNumber(result.packetLossPercent ?? result.packetLoss);
+  const successRate = toNumber(result.successRatePercent ?? result.successRate);
+  const testedAt = toIso(result.testedAt);
+  const downloadSingle = toNumber(result.downloadSingleMbps, downloadMbps);
+  const downloadMulti = toNumber(result.downloadMultiMbps, downloadMbps);
+  const uploadSingle = toNumber(result.uploadSingleMbps, uploadMbps);
+  const uploadMulti = toNumber(result.uploadMultiMbps, uploadMbps);
+
+  return {
+    latencyMs,
+    minLatencyMs: toNumber(result.minLatencyMs, latencyMs),
+    maxLatencyMs: toNumber(result.maxLatencyMs, latencyMs),
+    downloadMbps,
+    downloadSingleMbps: downloadSingle,
+    downloadMultiMbps: downloadMulti,
+    uploadMbps,
+    uploadSingleMbps: uploadSingle,
+    uploadMultiMbps: uploadMulti,
+    packetLoss,
+    packetLossPercent: packetLoss,
+    successRate,
+    successRatePercent: successRate,
+    stability: toNumber(result.stability),
+    singleThread: result.singleThread === true,
+    testedAt,
+    measuredAt: testedAt,
+    isDemo: result.isDemo !== false,
+  };
+}
 
 export function mapAirportSummary(airport: DbAirport): AirportSummary {
   return {
@@ -184,8 +235,7 @@ export function mapPromotion(item: DbPromotion): PromotionRecord {
   };
 }
 
-export function mapSpeedTest(test: DbSpeedTest): SpeedTestRecord | null {
-  if (!test.result) return null;
+export function mapSpeedTest(test: DbSpeedTest): SpeedTestRecord {
   return {
     id: test.id,
     airportId: test.airportId,
@@ -193,21 +243,17 @@ export function mapSpeedTest(test: DbSpeedTest): SpeedTestRecord | null {
     airportSlug: test.airport?.slug ?? "",
     nodeId: test.nodeId ?? "",
     nodeName: test.node?.name ?? "",
+    serverId: test.serverId ?? test.server?.id ?? "",
     serverName: test.server?.name ?? "测速点",
     status: test.status,
     mode: test.mode,
+    concurrency: test.concurrency ?? (test.mode === "MULTI_THREAD" ? 4 : 1),
     region: test.region,
-    startedAt: toIso(test.startedAt),
-    finishedAt: toIso(test.finishedAt),
-    result: {
-      latencyMs: toNumber(test.result.latencyMs),
-      downloadMbps: toNumber(test.result.downloadMbps),
-      uploadMbps: toNumber(test.result.uploadMbps),
-      packetLoss: toNumber(test.result.packetLoss),
-      successRate: toNumber(test.result.successRate),
-      stability: toNumber(test.result.stability),
-      testedAt: toIso(test.result.testedAt),
-    },
+    startedAt: test.startedAt ? toIso(test.startedAt) : null,
+    finishedAt: test.finishedAt ? toIso(test.finishedAt) : null,
+    errorMessage: test.errorMessage ?? null,
+    isDemo: test.isDemo !== false,
+    result: test.result ? mapResultMetrics(test.result) : null,
   };
 }
 
@@ -234,9 +280,7 @@ export function mapAirportDetail(
     categoryName: airport.category?.name ?? "未分类",
     plans: airport.plans.map(mapPlan),
     nodes: airport.nodes.map(mapNode),
-    speedTests: airport.speedTests
-      .map(mapSpeedTest)
-      .filter((item): item is SpeedTestRecord => item != null),
+    speedTests: airport.speedTests.map(mapSpeedTest),
     reviews: airport.reviews.map((review) =>
       mapReview({ ...review, airport: { name: airport.name } })
     ),

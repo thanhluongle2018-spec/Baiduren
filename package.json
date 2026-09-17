@@ -11,6 +11,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
     "prisma:studio": "prisma studio",
+    "worker": "tsx scripts/speedtest-worker.ts",
+    "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

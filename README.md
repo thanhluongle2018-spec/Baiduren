@@ -2,8 +2,8 @@
 
 机场测评、节点测速与数据排行榜网站。
 
-当前为第一阶段：网站基础架构、数据库模型、页面骨架与演示数据。  
-**页面上的测速结果和用户评价均为演示数据，不是真实测量或真实评价。**
+当前为第三阶段 A：测速任务、Worker、模拟执行器与排行榜聚合已经接通。  
+**页面上的测速结果和用户评价均为演示数据，不是真实测量或真实评价。本阶段不会探测真实机场或代理节点。**
 
 定位文案：机场测评 · 节点测速 · 数据排行榜
 
@@ -64,11 +64,14 @@ docker compose up -d
 | --- | --- |
 | `npx prisma generate` | 生成客户端到 `lib/generated/prisma` |
 | `npx prisma validate` | 校验 schema |
+| `npx prisma migrate deploy` | 应用已有 migration |
 | `npx prisma studio` | 打开数据浏览器 |
 | `npx prisma db seed` | 写入演示数据（需已 migrate） |
+| `npm run worker` | 启动模拟测速 Worker（独立进程） |
+| `npm test` | 状态机 / mock executor / Worker 集成测试 |
 
 Prisma 配置在 `prisma.config.ts`，模型在 `prisma/schema.prisma`。  
-应用代码通过 `lib/prisma.ts` 的 `getPrisma()` 懒加载客户端，前端页面第一阶段不直接打数据库。
+应用代码通过 `lib/prisma.ts` 的 `getPrisma()` 懒加载客户端。页面优先读库，库空或不可用时回退内存演示数据。
 
 ## 数据库 migration
 
@@ -120,40 +123,58 @@ npm run build
 npm run start
 ```
 
-生产环境需要有效的 `DATABASE_URL`。第一阶段页面仍读取演示数据；Prisma 客户端已生成，便于下一阶段切换。
+生产环境需要有效的 `DATABASE_URL`。页面是 `force-dynamic` 的，build 不要求库里已经有测速数据。
 
-## 后续测速系统架构说明
+## 测速系统架构（第三阶段 A）
 
-测速不与前端页面强耦合。计划中的数据流：
+测速不在 Next.js 请求里执行。当前数据流：
 
 ```
-测速服务器（SpeedTestServer / Agent）
+createSpeedTestJob() / POST /api/speed-tests（仅 demo）
         ↓
-   创建测速任务（SpeedTest）
+SpeedTest（PENDING）
         ↓
-   Worker 执行测速（单线程 / 多线程）
+Worker 领取任务（PostgreSQL FOR UPDATE SKIP LOCKED）
         ↓
-   回写结果（SpeedTestResult）
+检查 SpeedTestServer.maxConcurrentTests
         ↓
-   数据库聚合
+Mock executor（模拟指标，isDemo=true）
         ↓
-   排行榜 / 机场详情
+SpeedTestResult + SpeedTest SUCCESS/FAILED
+        ↓
+排行榜聚合最近 24 小时有效结果
 ```
 
-结果字段预留：
+状态机：
 
-- 延迟、下载速度、上传速度
-- 丢包率、连接成功率、稳定性
-- 测试时间、测试地区、测试服务器、被测节点
+- `PENDING → RUNNING → SUCCESS`
+- `RUNNING → FAILED`
+- `PENDING | RUNNING → CANCELLED`
+
+`COMPLETED` 仍保留为早期成功态，排行榜把它和 `SUCCESS` 同等对待。
+
+并发控制：
+
+- 以数据库中该测速服务器当前 `RUNNING` 数量对照 `maxConcurrentTests`
+- 任务领取使用事务 + `FOR UPDATE SKIP LOCKED`，可从数据库恢复，不依赖进程内变量
+- `lib/speedtest/prisma-queue.ts` 是队列端口实现，便于以后换成 Redis/BullMQ
+
+本阶段绝对不会：
+
+- 连接真实机场或代理节点
+- 扫描公网
+- 访问真实机场订阅
+- 写入真实服务器 IP
 
 代码入口：
 
-- 领域类型：`lib/speedtest/types.ts`
-- 任务队列占位：`lib/speedtest/queue.ts`
-- Stub 客户端：`lib/speedtest/client.ts`（只记录任务意图，不探测任何节点）
-- 排行榜数据层：`lib/data/ranking.ts`（以后把 `demo-data` 换成数据库聚合）
-
-Worker / Agent 应作为独立进程部署，通过数据库或消息队列与网站通信，而不是在 Next.js 请求里发起测速。
+- 创建任务：`lib/speedtest/jobs.ts`
+- Worker：`lib/speedtest/worker.ts`
+- 模拟执行器：`lib/speedtest/mock-executor.ts`
+- 状态机：`lib/speedtest/state-machine.ts`
+- 数据库队列：`lib/speedtest/prisma-queue.ts`
+- 独立进程：`scripts/speedtest-worker.ts`（`npm run worker`）
+- 排行榜聚合：`lib/data/ranking.ts`（最近 24 小时，综合评分仍用库存参考字段）
 
 ## 页面
 
@@ -167,9 +188,10 @@ Worker / Agent 应作为独立进程部署，通过数据库或消息队列与�
 均为演示数据，响应带 `demo: true`：
 
 - `GET /api/health`
-- `GET /api/ranking`
+- `GET /api/ranking`（最近 24 小时有效结果聚合）
 - `GET /api/airports`
 - `GET /api/airports/[slug]`
-- `GET /api/speed-tests`
+- `GET /api/speed-tests`（最近任务，含状态、测速服务器与结果）
+- `POST /api/speed-tests`（只创建 demo/mock 任务，拒绝真实测速）
 - `GET /api/reviews`
 - `GET /api/announcements`

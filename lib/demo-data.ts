@@ -240,6 +240,46 @@ export const nodes: AirportNode[] = [
   },
 ];
 
+function demoResult(input: {
+  latencyMs: number;
+  downloadSingleMbps: number;
+  downloadMultiMbps: number;
+  uploadSingleMbps: number;
+  uploadMultiMbps: number;
+  packetLoss: number;
+  successRate: number;
+  stability: number;
+  singleThread: boolean;
+  testedAt: string;
+}): SpeedTestRecord["result"] {
+  const downloadMbps = input.singleThread
+    ? input.downloadSingleMbps
+    : input.downloadMultiMbps;
+  const uploadMbps = input.singleThread
+    ? input.uploadSingleMbps
+    : input.uploadMultiMbps;
+  return {
+    latencyMs: input.latencyMs,
+    minLatencyMs: Math.max(20, input.latencyMs - 6),
+    maxLatencyMs: input.latencyMs + 8,
+    downloadMbps,
+    downloadSingleMbps: input.downloadSingleMbps,
+    downloadMultiMbps: input.downloadMultiMbps,
+    uploadMbps,
+    uploadSingleMbps: input.uploadSingleMbps,
+    uploadMultiMbps: input.uploadMultiMbps,
+    packetLoss: input.packetLoss,
+    packetLossPercent: input.packetLoss,
+    successRate: input.successRate,
+    successRatePercent: input.successRate,
+    stability: input.stability,
+    singleThread: input.singleThread,
+    testedAt: input.testedAt,
+    measuredAt: input.testedAt,
+    isDemo: true,
+  };
+}
+
 export const speedTests: SpeedTestRecord[] = [
   {
     id: "st_001",
@@ -248,21 +288,28 @@ export const speedTests: SpeedTestRecord[] = [
     airportSlug: "dukou-yun",
     nodeId: "node_dukou_hk",
     nodeName: "香港 01",
-    serverName: "演示测速点 · 上海",
-    status: "COMPLETED",
+    serverId: "server-hk-demo",
+    serverName: "演示测速服务器 · 香港",
+    status: "SUCCESS",
     mode: "MULTI_THREAD",
-    region: "上海",
+    concurrency: 4,
+    region: "香港",
     startedAt: "2026-09-16T10:00:00.000Z",
     finishedAt: "2026-09-16T10:02:00.000Z",
-    result: {
+    errorMessage: null,
+    isDemo: true,
+    result: demoResult({
       latencyMs: 38,
-      downloadMbps: 126.4,
-      uploadMbps: 42.1,
+      downloadSingleMbps: 86.2,
+      downloadMultiMbps: 126.4,
+      uploadSingleMbps: 28.4,
+      uploadMultiMbps: 42.1,
       packetLoss: 0.2,
       successRate: 99.0,
       stability: 92.0,
+      singleThread: false,
       testedAt: "2026-09-16T10:02:00.000Z",
-    },
+    }),
   },
   {
     id: "st_002",
@@ -271,21 +318,28 @@ export const speedTests: SpeedTestRecord[] = [
     airportSlug: "beian-wangluo",
     nodeId: "node_beian_tw",
     nodeName: "台北 01",
-    serverName: "演示测速点 · 上海",
-    status: "COMPLETED",
+    serverId: "server-cn-demo",
+    serverName: "演示测速服务器 · 中国大陆",
+    status: "SUCCESS",
     mode: "SINGLE_THREAD",
-    region: "上海",
+    concurrency: 1,
+    region: "中国大陆",
     startedAt: "2026-09-16T09:00:00.000Z",
     finishedAt: "2026-09-16T09:01:40.000Z",
-    result: {
+    errorMessage: null,
+    isDemo: true,
+    result: demoResult({
       latencyMs: 29,
-      downloadMbps: 88.6,
-      uploadMbps: 36.0,
+      downloadSingleMbps: 88.6,
+      downloadMultiMbps: 142.0,
+      uploadSingleMbps: 36.0,
+      uploadMultiMbps: 54.2,
       packetLoss: 0.1,
       successRate: 99.4,
       stability: 94.5,
+      singleThread: true,
       testedAt: "2026-09-16T09:01:40.000Z",
-    },
+    }),
   },
   {
     id: "st_003",
@@ -294,21 +348,28 @@ export const speedTests: SpeedTestRecord[] = [
     airportSlug: "dengta-xianlu",
     nodeId: "node_dengta_sg",
     nodeName: "新加坡 01",
-    serverName: "演示测速点 · 广州",
-    status: "COMPLETED",
+    serverId: "server-jp-demo",
+    serverName: "演示测速服务器 · 日本",
+    status: "SUCCESS",
     mode: "MULTI_THREAD",
-    region: "广州",
+    concurrency: 4,
+    region: "日本",
     startedAt: "2026-09-15T18:30:00.000Z",
     finishedAt: "2026-09-15T18:32:10.000Z",
-    result: {
+    errorMessage: null,
+    isDemo: true,
+    result: demoResult({
       latencyMs: 54,
-      downloadMbps: 101.2,
-      uploadMbps: 28.7,
+      downloadSingleMbps: 71.5,
+      downloadMultiMbps: 101.2,
+      uploadSingleMbps: 19.8,
+      uploadMultiMbps: 28.7,
       packetLoss: 0.6,
       successRate: 97.8,
       stability: 86.0,
+      singleThread: false,
       testedAt: "2026-09-15T18:32:10.000Z",
-    },
+    }),
   },
   {
     id: "st_004",
@@ -317,21 +378,28 @@ export const speedTests: SpeedTestRecord[] = [
     airportSlug: "qingzhou-hulian",
     nodeId: "node_qingzhou_us",
     nodeName: "洛杉矶 01",
-    serverName: "演示测速点 · 广州",
-    status: "COMPLETED",
+    serverId: "server-us-west-demo",
+    serverName: "演示测速服务器 · 美国西部",
+    status: "SUCCESS",
     mode: "SINGLE_THREAD",
-    region: "广州",
+    concurrency: 1,
+    region: "美国西部",
     startedAt: "2026-09-15T12:00:00.000Z",
     finishedAt: "2026-09-15T12:02:20.000Z",
-    result: {
+    errorMessage: null,
+    isDemo: true,
+    result: demoResult({
       latencyMs: 168,
-      downloadMbps: 64.3,
-      uploadMbps: 18.5,
+      downloadSingleMbps: 64.3,
+      downloadMultiMbps: 98.1,
+      uploadSingleMbps: 18.5,
+      uploadMultiMbps: 27.4,
       packetLoss: 1.1,
       successRate: 95.2,
       stability: 78.0,
+      singleThread: true,
       testedAt: "2026-09-15T12:02:20.000Z",
-    },
+    }),
   },
   {
     id: "st_005",
@@ -340,21 +408,28 @@ export const speedTests: SpeedTestRecord[] = [
     airportSlug: "chenfeng-jiasu",
     nodeId: "node_chenfeng_kr",
     nodeName: "首尔 01",
-    serverName: "演示测速点 · 上海",
-    status: "COMPLETED",
+    serverId: "server-cn-demo",
+    serverName: "演示测速服务器 · 中国大陆",
+    status: "SUCCESS",
     mode: "SINGLE_THREAD",
-    region: "上海",
+    concurrency: 1,
+    region: "中国大陆",
     startedAt: "2026-09-14T16:20:00.000Z",
     finishedAt: "2026-09-14T16:21:50.000Z",
-    result: {
+    errorMessage: null,
+    isDemo: true,
+    result: demoResult({
       latencyMs: 47,
-      downloadMbps: 72.8,
-      uploadMbps: 22.4,
+      downloadSingleMbps: 72.8,
+      downloadMultiMbps: 110.6,
+      uploadSingleMbps: 22.4,
+      uploadMultiMbps: 33.1,
       packetLoss: 0.8,
       successRate: 96.5,
       stability: 81.0,
+      singleThread: true,
       testedAt: "2026-09-14T16:21:50.000Z",
-    },
+    }),
   },
 ];
 
@@ -456,12 +531,18 @@ export const rankingRows: RankingRow[] = airports
       name: airport.name,
       logoText: airport.logoText,
       score: airport.score,
-      latencyMs: test?.result.latencyMs ?? 0,
-      downloadMbps: test?.result.downloadMbps ?? 0,
-      uploadMbps: test?.result.uploadMbps ?? 0,
-      packetLoss: test?.result.packetLoss ?? 0,
-      successRate: test?.result.successRate ?? 0,
-      stability: test?.result.stability ?? 0,
+      latencyMs: test?.result?.latencyMs ?? 0,
+      p50LatencyMs: test?.result?.latencyMs ?? 0,
+      downloadMbps: test?.result?.downloadMbps ?? 0,
+      downloadSingleMbps: test?.result?.downloadSingleMbps ?? 0,
+      downloadMultiMbps: test?.result?.downloadMultiMbps ?? 0,
+      uploadMbps: test?.result?.uploadMbps ?? 0,
+      uploadSingleMbps: test?.result?.uploadSingleMbps ?? 0,
+      uploadMultiMbps: test?.result?.uploadMultiMbps ?? 0,
+      packetLoss: test?.result?.packetLoss ?? 0,
+      successRate: test?.result?.successRate ?? 0,
+      stability: test?.result?.stability ?? 0,
+      sampleCount: test?.result ? 1 : 0,
       priceLabel: cheapestPlanLabel(airport.id),
       updatedAt: airport.updatedAt,
     };

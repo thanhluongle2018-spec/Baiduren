@@ -18,8 +18,8 @@ export default async function RankingPage() {
     <div className="mx-auto max-w-6xl px-4 py-8">
       <h1 className="text-2xl font-semibold tracking-tight">机场排行榜</h1>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-        延迟、下载、上传、丢包和成功率为 SpeedTestResult 平均值。综合评分为库存参考字段，本阶段不定稿算法。
-        当前排序按平均下载速度，仅用于展示。
+        延迟、下载、上传、丢包和成功率为最近 24 小时有效 SpeedTestResult 的平均值。
+        综合评分为库存参考字段，本阶段不定稿算法。当前排序按平均多线程下载速度，仅用于展示。
       </p>
       <div className="mt-4">
         {payload.demo ? (

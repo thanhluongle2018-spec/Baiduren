@@ -6,29 +6,44 @@ import {
   mapSpeedTest,
 } from "@/lib/data/mappers";
 import { airportScope, loadDatabaseOrDemo } from "@/lib/data/source";
+import { RECENT_JOB_LIMIT, SUCCESSFUL_STATUSES } from "@/lib/speedtest/constants";
 import type { AnnouncementRecord, PromotionRecord, ReviewRecord, SpeedTestRecord } from "@/types";
 import type { LoadedData } from "@/lib/data/source";
+
+const speedTestInclude = {
+  result: true,
+  node: true,
+  server: true,
+  airport: { select: { name: true, slug: true } },
+} as const;
 
 export async function listSpeedTests(): Promise<LoadedData<SpeedTestRecord[]>> {
   return loadDatabaseOrDemo(async (prisma) => {
     const where = await airportScope(prisma);
     const rows = await prisma.speedTest.findMany({
+      where: { airport: where },
+      orderBy: { createdAt: "desc" },
+      take: RECENT_JOB_LIMIT,
+      include: speedTestInclude,
+    });
+    return rows.map(mapSpeedTest);
+  }, speedTests);
+}
+
+export async function listSuccessfulSpeedTests(): Promise<LoadedData<SpeedTestRecord[]>> {
+  return loadDatabaseOrDemo(async (prisma) => {
+    const where = await airportScope(prisma);
+    const rows = await prisma.speedTest.findMany({
       where: {
-        status: "COMPLETED",
+        status: { in: SUCCESSFUL_STATUSES },
         result: { isNot: null },
         airport: where,
       },
       orderBy: { finishedAt: "desc" },
-      include: {
-        result: true,
-        node: true,
-        server: true,
-        airport: { select: { name: true, slug: true } },
-      },
+      take: RECENT_JOB_LIMIT,
+      include: speedTestInclude,
     });
-    return rows
-      .map(mapSpeedTest)
-      .filter((item): item is SpeedTestRecord => item != null);
+    return rows.map(mapSpeedTest);
   }, speedTests);
 }
 

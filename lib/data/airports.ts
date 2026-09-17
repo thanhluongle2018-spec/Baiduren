@@ -5,6 +5,7 @@ import {
 import { mapAirportDetail, mapAirportSummary } from "@/lib/data/mappers";
 import { airportScope, loadDatabaseOrDemo } from "@/lib/data/source";
 import { getPrisma } from "@/lib/prisma";
+import { SUCCESSFUL_STATUSES } from "@/lib/speedtest/constants";
 import type { AirportDetail, AirportSummary } from "@/types";
 import type { LoadedData } from "@/lib/data/source";
 
@@ -13,7 +14,7 @@ const airportInclude = {
   plans: { orderBy: { price: "asc" as const } },
   nodes: { orderBy: { name: "asc" as const } },
   speedTests: {
-    where: { status: "COMPLETED" as const, result: { isNot: null } },
+    where: { status: { in: SUCCESSFUL_STATUSES }, result: { isNot: null } },
     orderBy: { finishedAt: "desc" as const },
     include: {
       result: true,

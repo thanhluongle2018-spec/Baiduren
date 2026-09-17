@@ -1,5 +1,5 @@
-// 摆渡人 data model — phase 1
-// Speed tests are written by a future Worker / Agent, not by the frontend.
+// 摆渡人 data model — phase 3A SpeedTest architecture (mock executor only).
+// Real node probing, proxy connections, and public scans are out of scope.
 
 generator client {
   provider = "prisma-client"
@@ -22,10 +22,18 @@ enum ContentStatus {
   ARCHIVED
 }
 
+enum SpeedTestServerStatus {
+  ACTIVE
+  DISABLED
+}
+
 enum SpeedTestStatus {
   PENDING
   QUEUED
   RUNNING
+  /// Current success terminal used by the Worker.
+  SUCCESS
+  /// Legacy success terminal from earlier phases. Ranking still treats it as valid.
   COMPLETED
   FAILED
   CANCELLED
@@ -129,61 +137,87 @@ model Node {
   @@index([airportId, region])
 }
 
-/// Future independent speed-test servers / agents. Not used in phase 1.
+/// Independent speed-test servers / agents. Demo identifiers only — no real IPs.
 model SpeedTestServer {
-  id         String        @id @default(cuid())
-  name       String
-  region     String
-  endpoint   String?
-  status     ContentStatus @default(DRAFT)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
-  speedTests SpeedTest[]
+  id                 String                 @id @default(cuid())
+  name               String
+  region             String
+  countryCode        String
+  city               String
+  bandwidthMbps      Int
+  maxConcurrentTests Int                    @default(1)
+  /// Optional future callback URL. Never store a real probe target here in this phase.
+  endpoint           String?
+  status             SpeedTestServerStatus  @default(DISABLED)
+  isDemo             Boolean                @default(false)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  speedTests         SpeedTest[]
 
   @@index([region, status])
+  @@index([status])
 }
 
-/// A speed-test job. Created by the worker pipeline, not by page requests.
+/// A speed-test job. Created via createSpeedTestJob(); executed by the Worker.
 model SpeedTest {
-  id           String           @id @default(cuid())
+  id           String            @id @default(cuid())
   airportId    String
-  airport      Airport          @relation(fields: [airportId], references: [id], onDelete: Cascade)
+  airport      Airport           @relation(fields: [airportId], references: [id], onDelete: Cascade)
   nodeId       String?
-  node         Node?            @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  node         Node?             @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  /// Product field speedTestServerId.
   serverId     String?
-  server       SpeedTestServer? @relation(fields: [serverId], references: [id], onDelete: SetNull)
-  status       SpeedTestStatus  @default(PENDING)
-  mode         SpeedTestMode    @default(SINGLE_THREAD)
+  server       SpeedTestServer?  @relation(fields: [serverId], references: [id], onDelete: SetNull)
+  status       SpeedTestStatus   @default(PENDING)
+  mode         SpeedTestMode     @default(SINGLE_THREAD)
+  /// Simulated thread count. Valid range is 1–8.
+  concurrency  Int               @default(1)
   region       String
   startedAt    DateTime?
   /// Completion time. Maps to the product field completedAt.
   finishedAt   DateTime?
   errorMessage String?
-  isDemo       Boolean          @default(false)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  isDemo       Boolean           @default(false)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
   result       SpeedTestResult?
 
   @@index([airportId, createdAt])
   @@index([status, createdAt])
   @@index([nodeId])
   @@index([serverId])
+  @@index([serverId, status])
 }
 
 model SpeedTestResult {
-  id           String    @id @default(cuid())
-  speedTestId  String    @unique
-  speedTest    SpeedTest @relation(fields: [speedTestId], references: [id], onDelete: Cascade)
-  latencyMs    Decimal?  @db.Decimal(8, 2)
-  downloadMbps Decimal?  @db.Decimal(10, 2)
-  uploadMbps   Decimal?  @db.Decimal(10, 2)
-  packetLoss   Decimal?  @db.Decimal(5, 2)
-  successRate  Decimal?  @db.Decimal(5, 2)
-  stability    Decimal?  @db.Decimal(5, 2)
-  singleThread Boolean   @default(false)
+  id                   String    @id @default(cuid())
+  speedTestId          String    @unique
+  speedTest            SpeedTest @relation(fields: [speedTestId], references: [id], onDelete: Cascade)
+  latencyMs            Decimal?  @db.Decimal(8, 2)
+  minLatencyMs         Decimal?  @db.Decimal(8, 2)
+  maxLatencyMs         Decimal?  @db.Decimal(8, 2)
+  /// Legacy combined download. New writes also populate downloadSingle/Multi.
+  downloadMbps         Decimal?  @db.Decimal(10, 2)
+  downloadSingleMbps   Decimal?  @db.Decimal(10, 2)
+  downloadMultiMbps    Decimal?  @db.Decimal(10, 2)
+  /// Legacy combined upload. New writes also populate uploadSingle/Multi.
+  uploadMbps           Decimal?  @db.Decimal(10, 2)
+  uploadSingleMbps     Decimal?  @db.Decimal(10, 2)
+  uploadMultiMbps      Decimal?  @db.Decimal(10, 2)
+  /// Legacy packet loss. New writes also populate packetLossPercent.
+  packetLoss           Decimal?  @db.Decimal(5, 2)
+  packetLossPercent    Decimal?  @db.Decimal(5, 2)
+  /// Legacy success rate. New writes also populate successRatePercent.
+  successRate          Decimal?  @db.Decimal(5, 2)
+  successRatePercent   Decimal?  @db.Decimal(5, 2)
+  stability            Decimal?  @db.Decimal(5, 2)
+  singleThread         Boolean   @default(false)
   /// Measurement timestamp. Maps to the product field measuredAt.
-  testedAt     DateTime  @default(now())
-  createdAt    DateTime  @default(now())
+  testedAt             DateTime  @default(now())
+  isDemo               Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+
+  @@index([testedAt])
 }
 
 model Review {

@@ -86,17 +86,17 @@ export default async function AirportDetailPage({ params }: AirportPageProps) {
         />
         <StatCard
           label="延迟"
-          value={latest ? formatLatency(latest.result.latencyMs) : "—"}
+          value={latest?.result ? formatLatency(latest.result.latencyMs) : "—"}
           hint={metricHint}
         />
         <StatCard
           label="下载速度"
-          value={latest ? formatSpeed(latest.result.downloadMbps) : "—"}
+          value={latest?.result ? formatSpeed(latest.result.downloadMbps) : "—"}
           hint={metricHint}
         />
         <StatCard
           label="稳定性"
-          value={latest ? formatPercent(latest.result.stability) : "—"}
+          value={latest?.result ? formatPercent(latest.result.stability) : "—"}
           hint={metricHint}
         />
       </div>

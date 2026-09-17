@@ -6,8 +6,9 @@ import type {
 } from "@/lib/speedtest/types";
 
 /**
- * Phase 1 stub. It records job intent in memory and never probes a node,
- * opens a tunnel, or calls a third-party speed-test API.
+ * Legacy in-memory stub from earlier phases.
+ * Production job creation uses createSpeedTestJob() + PostgreSQL.
+ * This client still never probes a node, opens a tunnel, or calls a speed-test API.
  */
 export class StubSpeedTestClient implements SpeedTestWorkerClient {
   async enqueue(job: CreateSpeedTestJob): Promise<Pick<SpeedTestJob, "id" | "status">> {

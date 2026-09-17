@@ -1,10 +1,12 @@
 export type DataMode = "demo" | "database";
 
 export type ContentStatus = "DRAFT" | "ACTIVE" | "PAUSED" | "ARCHIVED";
+export type SpeedTestServerStatus = "ACTIVE" | "DISABLED";
 export type SpeedTestStatus =
   | "PENDING"
   | "QUEUED"
   | "RUNNING"
+  | "SUCCESS"
   | "COMPLETED"
   | "FAILED"
   | "CANCELLED";
@@ -54,6 +56,27 @@ export type AirportNode = {
   status: ContentStatus;
 };
 
+export type SpeedTestResultView = {
+  latencyMs: number;
+  minLatencyMs: number;
+  maxLatencyMs: number;
+  downloadMbps: number;
+  downloadSingleMbps: number;
+  downloadMultiMbps: number;
+  uploadMbps: number;
+  uploadSingleMbps: number;
+  uploadMultiMbps: number;
+  packetLoss: number;
+  packetLossPercent: number;
+  successRate: number;
+  successRatePercent: number;
+  stability: number;
+  singleThread: boolean;
+  testedAt: string;
+  measuredAt: string;
+  isDemo: boolean;
+};
+
 export type SpeedTestRecord = {
   id: string;
   airportId: string;
@@ -61,21 +84,17 @@ export type SpeedTestRecord = {
   airportSlug: string;
   nodeId: string;
   nodeName: string;
+  serverId: string;
   serverName: string;
   status: SpeedTestStatus;
   mode: SpeedTestMode;
+  concurrency: number;
   region: string;
-  startedAt: string;
-  finishedAt: string;
-  result: {
-    latencyMs: number;
-    downloadMbps: number;
-    uploadMbps: number;
-    packetLoss: number;
-    successRate: number;
-    stability: number;
-    testedAt: string;
-  };
+  startedAt: string | null;
+  finishedAt: string | null;
+  errorMessage: string | null;
+  isDemo: boolean;
+  result: SpeedTestResultView | null;
 };
 
 export type ReviewRecord = {
@@ -117,11 +136,17 @@ export type RankingRow = {
   logoText: string;
   score: number;
   latencyMs: number;
+  p50LatencyMs: number;
   downloadMbps: number;
+  downloadSingleMbps: number;
+  downloadMultiMbps: number;
   uploadMbps: number;
+  uploadSingleMbps: number;
+  uploadMultiMbps: number;
   packetLoss: number;
   successRate: number;
   stability: number;
+  sampleCount: number;
   priceLabel: string;
   updatedAt: string;
 };

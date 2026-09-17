@@ -122,7 +122,7 @@ export default async function HomePage() {
       <section className="mx-auto max-w-6xl px-4 py-6">
         <h2 className="text-lg font-semibold tracking-tight">最新测速</h2>
         <p className="mt-1 mb-4 text-sm text-muted-foreground">
-          完成态测速记录，含延迟、下载速度、稳定性等字段。
+          最近测速任务，含测速服务器、状态与单/多线程指标。未完成任务没有结果字段。
         </p>
         <Card>
           <CardContent className="pt-4">
@@ -146,8 +146,8 @@ export default async function HomePage() {
               <CardTitle>第二阶段范围</CardTitle>
             </CardHeader>
             <CardContent className="text-sm leading-7 text-muted-foreground">
-              已接入 PostgreSQL + Prisma。页面优先读库，库空或不可用时回退演示数据。
-              尚未开发真实测速 Worker、管理员登录与后台 CRUD。
+              已接入 PostgreSQL + Prisma，以及模拟测速 Worker。
+              尚未开发真实节点探测、管理员登录与后台 CRUD。
             </CardContent>
           </Card>
         </div>

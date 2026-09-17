@@ -23,7 +23,7 @@ export default async function AdminSpeedTestsPage() {
     <div>
       <AdminPageHeader
         title="SpeedTest 管理"
-        description="只读列表。正式测速任务仍由后续 Worker 写入。"
+        description="只读列表。任务由 createSpeedTestJob 写入，Worker 以模拟执行器回写结果。"
       />
       <Table>
         <TableHeader>
@@ -32,7 +32,9 @@ export default async function AdminSpeedTestsPage() {
             <TableHead>机场</TableHead>
             <TableHead>节点</TableHead>
             <TableHead>模式</TableHead>
+            <TableHead>测速服务器</TableHead>
             <TableHead>状态</TableHead>
+            <TableHead>错误</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -44,7 +46,11 @@ export default async function AdminSpeedTestsPage() {
               <TableCell>
                 {test.mode === "MULTI_THREAD" ? "多线程" : "单线程"}
               </TableCell>
+              <TableCell>{test.serverName}</TableCell>
               <TableCell>{test.status}</TableCell>
+              <TableCell className="max-w-[16rem] truncate text-muted-foreground">
+                {test.errorMessage ?? "—"}
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
