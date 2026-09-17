@@ -7,8 +7,13 @@ import { SpeedTestJobError } from "../lib/speedtest/errors";
 import { createSpeedTestJob } from "../lib/speedtest/jobs";
 import {
   claimNextPendingJob,
+  markJobFailed,
+  persistSuccessfulResult,
   processNextJob,
 } from "../lib/speedtest/worker";
+import { simulateMetrics } from "../lib/speedtest/mock-executor";
+import { reapExpiredLeases, extendJobLease } from "../lib/speedtest/transitions";
+import { LEASE_TIMEOUT_MESSAGE } from "../lib/speedtest/constants";
 import type { SpeedTestExecutor } from "../lib/speedtest/types";
 
 const prisma = getPrisma();
@@ -337,4 +342,112 @@ test("database loader falls back to demo data when the query fails", async () =>
     source: "demo",
     data: ["demo-fallback"],
   });
+});
+
+test("expired RUNNING lease is failed and frees server capacity", async () => {
+  await cancelOpenJobs();
+  const job = await createSpeedTestJob(
+    { airportId, nodeId, speedTestServerId: serverId },
+    prisma
+  );
+  const claimed = await claimNextPendingJob(prisma, { serverId });
+  assert.equal(claimed?.id, job.id);
+
+  await prisma.speedTest.update({
+    where: { id: job.id },
+    data: { leaseExpiresAt: new Date(Date.now() - 1000) },
+  });
+
+  const reaped = await reapExpiredLeases(prisma);
+  assert.ok(reaped.count >= 1);
+
+  const stored = await prisma.speedTest.findUnique({ where: { id: job.id } });
+  assert.equal(stored?.status, "FAILED");
+  assert.equal(stored?.errorMessage, LEASE_TIMEOUT_MESSAGE);
+  assert.equal(stored?.leaseExpiresAt, null);
+
+  const nextJob = await createSpeedTestJob(
+    { airportId, nodeId, speedTestServerId: serverId },
+    prisma
+  );
+  const nextClaim = await claimNextPendingJob(prisma, { serverId });
+  assert.equal(nextClaim?.id, nextJob.id);
+});
+
+test("SUCCESS and FAILED only apply while the job is still RUNNING", async () => {
+  await cancelOpenJobs();
+  const job = await createSpeedTestJob(
+    { airportId, nodeId, speedTestServerId: serverId },
+    prisma
+  );
+  const claimed = await claimNextPendingJob(prisma, { serverId });
+  assert.ok(claimed);
+
+  const firstMetrics = simulateMetrics(1);
+  firstMetrics.downloadSingleMbps = 21.5;
+  const secondMetrics = simulateMetrics(1);
+  secondMetrics.downloadSingleMbps = 99.5;
+
+  const [left, right] = await Promise.all([
+    persistSuccessfulResult(claimed, firstMetrics, prisma),
+    persistSuccessfulResult(claimed, secondMetrics, prisma),
+  ]);
+  const persisted = [left, right].filter(Boolean);
+  assert.equal(persisted.length, 1);
+
+  const stored = await prisma.speedTest.findUnique({
+    where: { id: job.id },
+    include: { result: true },
+  });
+  assert.equal(stored?.status, "SUCCESS");
+  assert.ok(stored?.result);
+
+  const failed = await markJobFailed(job.id, "should not overwrite", prisma);
+  assert.equal(failed?.status, "SUCCESS");
+  assert.equal(failed?.errorMessage, null);
+});
+
+test("heartbeat cannot refresh lease after SUCCESS or FAILED", async () => {
+  await cancelOpenJobs();
+  const successJob = await createSpeedTestJob(
+    { airportId, nodeId, speedTestServerId: serverId },
+    prisma
+  );
+  const claimed = await claimNextPendingJob(prisma, { serverId });
+  assert.equal(claimed?.id, successJob.id);
+  const saved = await persistSuccessfulResult(
+    claimed,
+    simulateMetrics(1),
+    prisma
+  );
+  assert.equal(saved?.status, "SUCCESS");
+
+  const afterSuccess = await extendJobLease(prisma, successJob.id);
+  assert.equal(afterSuccess.count, 0);
+  const successRow = await prisma.speedTest.findUnique({
+    where: { id: successJob.id },
+  });
+  assert.equal(successRow?.status, "SUCCESS");
+  assert.equal(successRow?.leaseExpiresAt, null);
+
+  await cancelOpenJobs();
+  const failedJob = await createSpeedTestJob(
+    { airportId, nodeId, speedTestServerId: serverId },
+    prisma
+  );
+  const running = await claimNextPendingJob(prisma, { serverId });
+  assert.equal(running?.id, failedJob.id);
+  await prisma.speedTest.update({
+    where: { id: failedJob.id },
+    data: { leaseExpiresAt: new Date(Date.now() - 1000) },
+  });
+  await reapExpiredLeases(prisma);
+
+  const afterFailed = await extendJobLease(prisma, failedJob.id);
+  assert.equal(afterFailed.count, 0);
+  const failedRow = await prisma.speedTest.findUnique({
+    where: { id: failedJob.id },
+  });
+  assert.equal(failedRow?.status, "FAILED");
+  assert.equal(failedRow?.leaseExpiresAt, null);
 });

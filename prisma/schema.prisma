@@ -177,6 +177,10 @@ model SpeedTest {
   /// Completion time. Maps to the product field completedAt.
   finishedAt   DateTime?
   errorMessage String?
+  /// Worker lease deadline. Expired RUNNING jobs are failed by the reaper.
+  leaseExpiresAt DateTime?
+  /// Last successful lease heartbeat from the owning Worker.
+  heartbeatAt    DateTime?
   isDemo       Boolean           @default(false)
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
@@ -187,6 +191,7 @@ model SpeedTest {
   @@index([nodeId])
   @@index([serverId])
   @@index([serverId, status])
+  @@index([status, leaseExpiresAt])
 }
 
 model SpeedTestResult {

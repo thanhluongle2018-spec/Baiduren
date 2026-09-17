@@ -16,6 +16,11 @@ export {
   processNextJob,
   runWorkerLoop,
 } from "@/lib/speedtest/worker";
+export {
+  applyStatusTransition,
+  extendJobLease,
+  reapExpiredLeases,
+} from "@/lib/speedtest/transitions";
 export { mockSpeedTestExecutor, MockSpeedTestExecutor } from "@/lib/speedtest/mock-executor";
 export {
   assertTransition,

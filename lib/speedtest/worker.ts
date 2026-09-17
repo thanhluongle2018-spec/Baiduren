@@ -1,9 +1,16 @@
 import { Prisma } from "@/lib/generated/prisma/client";
 import type { PrismaClient } from "@/lib/generated/prisma/client";
 import { getPrisma } from "@/lib/prisma";
+import { HEARTBEAT_INTERVAL_MS } from "@/lib/speedtest/constants";
 import { storedExecutorErrorMessage } from "@/lib/speedtest/errors";
 import { mockSpeedTestExecutor } from "@/lib/speedtest/mock-executor";
-import { canTransition } from "@/lib/speedtest/state-machine";
+import {
+  applyStatusTransition,
+  clearedLease,
+  extendJobLease,
+  nextLeaseExpiry,
+  reapExpiredLeases,
+} from "@/lib/speedtest/transitions";
 import type {
   ClaimedSpeedTestJob,
   MockSpeedTestMetrics,
@@ -49,6 +56,12 @@ function skipIdsSql(ids: string[]) {
   if (ids.length === 0) return Prisma.sql``;
   return Prisma.sql`AND st.id NOT IN (${Prisma.join(ids)})`;
 }
+
+const claimedInclude = {
+  airport: { select: { name: true } },
+  node: { select: { name: true } },
+  server: { select: { name: true } },
+} as const;
 
 /**
  * Claim one PENDING job using a database lock.
@@ -112,19 +125,28 @@ export async function claimNextPendingJob(
         continue;
       }
 
-      const updated = await tx.speedTest.update({
-        where: { id: candidate.id },
+      const now = new Date();
+      const moved = await applyStatusTransition(tx, {
+        id: candidate.id,
+        from: ["PENDING", "QUEUED"],
+        to: "RUNNING",
         data: {
-          status: "RUNNING",
-          startedAt: new Date(),
-        },
-        include: {
-          airport: { select: { name: true } },
-          node: { select: { name: true } },
-          server: { select: { name: true } },
+          startedAt: now,
+          errorMessage: null,
+          leaseExpiresAt: nextLeaseExpiry(now),
+          heartbeatAt: now,
         },
       });
+      if (moved.count !== 1) {
+        skippedJobIds.push(candidate.id);
+        continue;
+      }
 
+      const updated = await tx.speedTest.findUnique({
+        where: { id: candidate.id },
+        include: claimedInclude,
+      });
+      if (!updated) return null;
       return toClaimedJob(updated);
     }
 
@@ -166,20 +188,19 @@ export async function markJobFailed(
   errorMessage: string,
   prisma: PrismaClient = getPrisma()
 ) {
-  const current = await prisma.speedTest.findUnique({
-    where: { id: jobId },
-    select: { status: true },
-  });
-  if (!current) return null;
-  if (!canTransition(current.status, "FAILED")) return current;
-
-  return prisma.speedTest.update({
-    where: { id: jobId },
+  const now = new Date();
+  await applyStatusTransition(prisma, {
+    id: jobId,
+    from: "RUNNING",
+    to: "FAILED",
     data: {
-      status: "FAILED",
-      finishedAt: new Date(),
+      finishedAt: now,
       errorMessage,
+      ...clearedLease,
     },
+  });
+  return prisma.speedTest.findUnique({
+    where: { id: jobId },
   });
 }
 
@@ -189,12 +210,18 @@ export async function persistSuccessfulResult(
   prisma: PrismaClient = getPrisma()
 ) {
   return prisma.$transaction(async (tx) => {
-    const current = await tx.speedTest.findUnique({
-      where: { id: job.id },
-      select: { status: true },
+    const moved = await applyStatusTransition(tx, {
+      id: job.id,
+      from: "RUNNING",
+      to: "SUCCESS",
+      data: {
+        finishedAt: new Date(),
+        errorMessage: null,
+        ...clearedLease,
+      },
     });
-    if (!current || !canTransition(current.status, "SUCCESS")) {
-      return current;
+    if (moved.count !== 1) {
+      return null;
     }
 
     await tx.speedTestResult.upsert({
@@ -206,13 +233,8 @@ export async function persistSuccessfulResult(
       },
     });
 
-    return tx.speedTest.update({
+    return tx.speedTest.findUnique({
       where: { id: job.id },
-      data: {
-        status: "SUCCESS",
-        finishedAt: new Date(),
-        errorMessage: null,
-      },
     });
   });
 }
@@ -221,6 +243,13 @@ export type ProcessNextJobResult =
   | { claimed: false }
   | { claimed: true; jobId: string; status: "SUCCESS" | "FAILED" };
 
+function startLeaseHeartbeat(prisma: PrismaClient, jobId: string) {
+  const timer = setInterval(() => {
+    void extendJobLease(prisma, jobId).catch(() => undefined);
+  }, HEARTBEAT_INTERVAL_MS);
+  return () => clearInterval(timer);
+}
+
 export async function processNextJob(options?: {
   prisma?: PrismaClient;
   executor?: SpeedTestExecutor;
@@ -228,6 +257,12 @@ export async function processNextJob(options?: {
 }): Promise<ProcessNextJobResult> {
   const prisma = options?.prisma ?? getPrisma();
   const executor = options?.executor ?? mockSpeedTestExecutor;
+
+  try {
+    await reapExpiredLeases(prisma);
+  } catch {
+    // Reaper failure must not crash the worker loop.
+  }
 
   let claimed: ClaimedSpeedTestJob | null = null;
   try {
@@ -238,6 +273,7 @@ export async function processNextJob(options?: {
 
   if (!claimed) return { claimed: false };
 
+  const stopHeartbeat = startLeaseHeartbeat(prisma, claimed.id);
   try {
     if (!claimed.serverId) {
       await markJobFailed(claimed.id, "测速任务未关联测速服务器。", prisma);
@@ -258,8 +294,20 @@ export async function processNextJob(options?: {
     }
 
     const metrics = await executor.run(claimed);
-    await persistSuccessfulResult(claimed, metrics, prisma);
-    return { claimed: true, jobId: claimed.id, status: "SUCCESS" };
+    const saved = await persistSuccessfulResult(claimed, metrics, prisma);
+    if (saved?.status === "SUCCESS") {
+      return { claimed: true, jobId: claimed.id, status: "SUCCESS" };
+    }
+
+    const current = await prisma.speedTest.findUnique({
+      where: { id: claimed.id },
+      select: { status: true },
+    });
+    return {
+      claimed: true,
+      jobId: claimed.id,
+      status: current?.status === "SUCCESS" ? "SUCCESS" : "FAILED",
+    };
   } catch (error) {
     try {
       await markJobFailed(claimed.id, storedExecutorErrorMessage(error), prisma);
@@ -267,6 +315,8 @@ export async function processNextJob(options?: {
       // Never let persistence errors crash the worker loop.
     }
     return { claimed: true, jobId: claimed.id, status: "FAILED" };
+  } finally {
+    stopHeartbeat();
   }
 }
 
