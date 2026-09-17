@@ -71,6 +71,19 @@ export type MockSpeedTestMetrics = {
   isDemo: true;
 };
 
+export type SpeedTestParamSnapshot = {
+  testVersion: string | null;
+  latencyAttempts: number | null;
+  pingTimeoutMs: number | null;
+  downloadConcurrency: number | null;
+  uploadConcurrency: number | null;
+  singleDownloadCapBytes: number | null;
+  multiDownloadCapBytes: number | null;
+  singleUploadCapBytes: number | null;
+  multiUploadCapBytes: number | null;
+  totalTrafficCapBytes: number | null;
+};
+
 export type SpeedTestJob = {
   id: string;
   status: SpeedTestJobStatus;

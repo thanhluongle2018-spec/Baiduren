@@ -58,6 +58,30 @@ export function toNumber(value: unknown, fallback = 0): number {
   return Number.isFinite(numeric) ? numeric : fallback;
 }
 
+/** Missing/invalid metrics stay null. Do not coerce untested stages to 0. */
+export function toNullableNumber(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "object" && value !== null && "toNumber" in value) {
+    const numeric = (value as { toNumber: () => number }).toNumber();
+    return Number.isFinite(numeric) ? numeric : null;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+export function toNullableBoolean(value: unknown): boolean | null {
+  if (value === true) return true;
+  if (value === false) return false;
+  return null;
+}
+
+export function toNullableInt(value: unknown): number | null {
+  const numeric = toNullableNumber(value);
+  if (numeric == null) return null;
+  return Number.isInteger(numeric) ? numeric : Math.trunc(numeric);
+}
+
 export function logoTextFromName(name: string) {
   return [...name][0] ?? "?";
 }

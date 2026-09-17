@@ -1,5 +1,12 @@
-import { logoTextFromName, toIso, toNumber } from "@/lib/data/source";
+import { logoTextFromName, toIso, toNullableBoolean, toNullableInt, toNullableNumber, toNumber } from "@/lib/data/source";
 import { formatPrice } from "@/lib/format";
+import {
+  isSpeedTestStage,
+  sanitizeEngineErrorCode,
+  sanitizeSkippedStages,
+  sanitizeStageStatus,
+} from "@/lib/speedtest/raw-metrics";
+import { redactSecrets } from "@/lib/subscription/secrets";
 import type {
   AirportDetail,
   AirportNode,
@@ -83,6 +90,11 @@ type DbResult = {
   latencyMs: DecimalLike;
   minLatencyMs?: DecimalLike;
   maxLatencyMs?: DecimalLike;
+  latencyAvgMs?: DecimalLike;
+  latencyP50Ms?: DecimalLike;
+  latencyP90Ms?: DecimalLike;
+  latencyAttempts?: number | null;
+  latencySuccessCount?: number | null;
   downloadMbps: DecimalLike;
   downloadSingleMbps?: DecimalLike;
   downloadMultiMbps?: DecimalLike;
@@ -91,9 +103,33 @@ type DbResult = {
   uploadMultiMbps?: DecimalLike;
   packetLoss: DecimalLike;
   packetLossPercent?: DecimalLike;
+  packetLossTotal?: number | null;
+  packetLossSuccess?: number | null;
   successRate: DecimalLike;
   successRatePercent?: DecimalLike;
+  successRateTotal?: number | null;
+  successRateSuccess?: number | null;
   stability: DecimalLike;
+  singleDownloadBytes?: number | null;
+  singleDownloadDurationMs?: number | null;
+  singleDownloadStatus?: string | null;
+  multiDownloadBytes?: number | null;
+  multiDownloadDurationMs?: number | null;
+  multiDownloadConcurrency?: number | null;
+  multiDownloadStatus?: string | null;
+  singleUploadBytes?: number | null;
+  singleUploadDurationMs?: number | null;
+  singleUploadStatus?: string | null;
+  multiUploadBytes?: number | null;
+  multiUploadDurationMs?: number | null;
+  multiUploadConcurrency?: number | null;
+  multiUploadStatus?: string | null;
+  skippedStages?: unknown;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  exitVerified?: boolean | null;
+  directIdentityHash?: string | null;
+  proxiedIdentityHash?: string | null;
   singleThread?: boolean;
   testedAt: Date;
   isDemo?: boolean;
@@ -111,6 +147,22 @@ type DbSpeedTest = {
   startedAt: Date | null;
   finishedAt: Date | null;
   errorMessage?: string | null;
+  errorCode?: string | null;
+  testVersion?: string | null;
+  currentStage?: string | null;
+  latencyAttempts?: number | null;
+  pingTimeoutMs?: number | null;
+  downloadConcurrency?: number | null;
+  uploadConcurrency?: number | null;
+  singleDownloadCapBytes?: number | null;
+  multiDownloadCapBytes?: number | null;
+  singleUploadCapBytes?: number | null;
+  multiUploadCapBytes?: number | null;
+  totalTrafficCapBytes?: number | null;
+  serverMaxConcurrencySnapshot?: number | null;
+  serverBandwidthMbpsSnapshot?: number | null;
+  nodeConcurrencySnapshot?: number | null;
+  airportConcurrencySnapshot?: number | null;
   isDemo?: boolean;
   airport?: { name: string; slug: string } | null;
   node?: { name: string } | null;
@@ -149,6 +201,33 @@ export function mapResultMetrics(result: DbResult): SpeedTestResultView {
     testedAt,
     measuredAt: testedAt,
     isDemo: result.isDemo !== false,
+    latencyAvgMs: toNullableNumber(result.latencyAvgMs),
+    latencyP50Ms: toNullableNumber(result.latencyP50Ms),
+    latencyP90Ms: toNullableNumber(result.latencyP90Ms),
+    latencyAttempts: toNullableInt(result.latencyAttempts),
+    latencySuccessCount: toNullableInt(result.latencySuccessCount),
+    packetLossTotal: toNullableInt(result.packetLossTotal),
+    packetLossSuccess: toNullableInt(result.packetLossSuccess),
+    successRateTotal: toNullableInt(result.successRateTotal),
+    successRateSuccess: toNullableInt(result.successRateSuccess),
+    singleDownloadBytes: toNullableInt(result.singleDownloadBytes),
+    singleDownloadDurationMs: toNullableInt(result.singleDownloadDurationMs),
+    singleDownloadStatus: sanitizeStageStatus(result.singleDownloadStatus),
+    multiDownloadBytes: toNullableInt(result.multiDownloadBytes),
+    multiDownloadDurationMs: toNullableInt(result.multiDownloadDurationMs),
+    multiDownloadConcurrency: toNullableInt(result.multiDownloadConcurrency),
+    multiDownloadStatus: sanitizeStageStatus(result.multiDownloadStatus),
+    singleUploadBytes: toNullableInt(result.singleUploadBytes),
+    singleUploadDurationMs: toNullableInt(result.singleUploadDurationMs),
+    singleUploadStatus: sanitizeStageStatus(result.singleUploadStatus),
+    multiUploadBytes: toNullableInt(result.multiUploadBytes),
+    multiUploadDurationMs: toNullableInt(result.multiUploadDurationMs),
+    multiUploadConcurrency: toNullableInt(result.multiUploadConcurrency),
+    multiUploadStatus: sanitizeStageStatus(result.multiUploadStatus),
+    skippedStages: sanitizeSkippedStages(result.skippedStages),
+    errorCode: sanitizeEngineErrorCode(result.errorCode),
+    errorMessage: result.errorMessage ? redactSecrets(result.errorMessage) : null,
+    exitVerified: toNullableBoolean(result.exitVerified),
   };
 }
 
@@ -251,9 +330,25 @@ export function mapSpeedTest(test: DbSpeedTest): SpeedTestRecord {
     region: test.region,
     startedAt: test.startedAt ? toIso(test.startedAt) : null,
     finishedAt: test.finishedAt ? toIso(test.finishedAt) : null,
-    errorMessage: test.errorMessage ?? null,
+    errorMessage: test.errorMessage ? redactSecrets(test.errorMessage) : null,
     isDemo: test.isDemo !== false,
     result: test.result ? mapResultMetrics(test.result) : null,
+    testVersion: test.testVersion ?? null,
+    currentStage: isSpeedTestStage(test.currentStage) ? test.currentStage : null,
+    errorCode: sanitizeEngineErrorCode(test.errorCode),
+    latencyAttempts: toNullableInt(test.latencyAttempts),
+    pingTimeoutMs: toNullableInt(test.pingTimeoutMs),
+    downloadConcurrency: toNullableInt(test.downloadConcurrency),
+    uploadConcurrency: toNullableInt(test.uploadConcurrency),
+    singleDownloadCapBytes: toNullableInt(test.singleDownloadCapBytes),
+    multiDownloadCapBytes: toNullableInt(test.multiDownloadCapBytes),
+    singleUploadCapBytes: toNullableInt(test.singleUploadCapBytes),
+    multiUploadCapBytes: toNullableInt(test.multiUploadCapBytes),
+    totalTrafficCapBytes: toNullableInt(test.totalTrafficCapBytes),
+    serverMaxConcurrencySnapshot: toNullableInt(test.serverMaxConcurrencySnapshot),
+    serverBandwidthMbpsSnapshot: toNullableInt(test.serverBandwidthMbpsSnapshot),
+    nodeConcurrencySnapshot: toNullableInt(test.nodeConcurrencySnapshot),
+    airportConcurrencySnapshot: toNullableInt(test.airportConcurrencySnapshot),
   };
 }
 

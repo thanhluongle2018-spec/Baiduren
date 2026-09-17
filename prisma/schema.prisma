@@ -1,5 +1,5 @@
-// 摆渡人 data model — phase 3B-1 subscription parse + phase 3A mock speedtest.
-// Real node probing, proxy connections, and public scans are out of scope.
+// 摆渡人 data model — phase 3B-3 raw metrics schema.
+// Real node probing, proxy connections, and public scans remain out of scope.
 
 generator client {
   provider = "prisma-client"
@@ -42,6 +42,26 @@ enum SpeedTestStatus {
 enum SpeedTestMode {
   SINGLE_THREAD
   MULTI_THREAD
+}
+
+/// Stage of a speed test run. Null on legacy rows means the stage is unknown.
+enum SpeedTestStage {
+  LATENCY
+  PACKET_LOSS
+  SINGLE_DOWNLOAD
+  MULTI_DOWNLOAD
+  SINGLE_UPLOAD
+  MULTI_UPLOAD
+  COMPLETE
+}
+
+/// Per-transfer outcome. Distinct from SpeedTestStatus (job lifecycle).
+enum SpeedTestStageStatus {
+  SUCCESS
+  PARTIAL
+  TIMEOUT
+  FAILED
+  SKIPPED
 }
 
 enum ReviewStatus {
@@ -194,6 +214,27 @@ model SpeedTest {
   leaseExpiresAt DateTime?
   /// Last successful lease heartbeat from the owning Worker.
   heartbeatAt    DateTime?
+  /// Engine error code. Null on legacy rows. Never store secrets here.
+  errorCode    String?
+  /// Future protocol version, e.g. 3b3-v1. Not a database default.
+  testVersion  String?
+  /// Last observed stage. Null on legacy rows; not the same as 0 Mbps.
+  currentStage SpeedTestStage?
+  latencyAttempts          Int?
+  pingTimeoutMs            Int?
+  downloadConcurrency      Int?
+  uploadConcurrency        Int?
+  singleDownloadCapBytes   Int?
+  multiDownloadCapBytes    Int?
+  singleUploadCapBytes     Int?
+  multiUploadCapBytes      Int?
+  totalTrafficCapBytes     Int?
+  /// Snapshots of capacity at test time. Null when the source model has no value.
+  serverMaxConcurrencySnapshot Int?
+  serverBandwidthMbpsSnapshot  Int?
+  /// No Node/Airport concurrency field exists yet; left nullable on purpose.
+  nodeConcurrencySnapshot      Int?
+  airportConcurrencySnapshot   Int?
   isDemo       Boolean           @default(false)
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
@@ -211,9 +252,15 @@ model SpeedTestResult {
   id                   String    @id @default(cuid())
   speedTestId          String    @unique
   speedTest            SpeedTest @relation(fields: [speedTestId], references: [id], onDelete: Cascade)
+  /// Legacy headline latency. Future real runs may dual-write P50 here.
   latencyMs            Decimal?  @db.Decimal(8, 2)
   minLatencyMs         Decimal?  @db.Decimal(8, 2)
   maxLatencyMs         Decimal?  @db.Decimal(8, 2)
+  latencyAvgMs         Decimal?  @db.Decimal(12, 6)
+  latencyP50Ms         Decimal?  @db.Decimal(12, 6)
+  latencyP90Ms         Decimal?  @db.Decimal(12, 6)
+  latencyAttempts      Int?
+  latencySuccessCount  Int?
   /// Legacy combined download. New writes also populate downloadSingle/Multi.
   downloadMbps         Decimal?  @db.Decimal(10, 2)
   downloadSingleMbps   Decimal?  @db.Decimal(10, 2)
@@ -225,10 +272,40 @@ model SpeedTestResult {
   /// Legacy packet loss. New writes also populate packetLossPercent.
   packetLoss           Decimal?  @db.Decimal(5, 2)
   packetLossPercent    Decimal?  @db.Decimal(5, 2)
+  packetLossTotal      Int?
+  packetLossSuccess    Int?
   /// Legacy success rate. New writes also populate successRatePercent.
+  /// successRate* is ping-only; do not mix download/upload into it.
   successRate          Decimal?  @db.Decimal(5, 2)
   successRatePercent   Decimal?  @db.Decimal(5, 2)
+  successRateTotal     Int?
+  successRateSuccess   Int?
+  /// Phase 4 owns stability. Do not auto-fill 0 or derive it in 3B-3.
   stability            Decimal?  @db.Decimal(5, 2)
+  singleDownloadBytes      Int?
+  singleDownloadDurationMs Int?
+  singleDownloadStatus     SpeedTestStageStatus?
+  multiDownloadBytes       Int?
+  multiDownloadDurationMs  Int?
+  multiDownloadConcurrency Int?
+  multiDownloadStatus      SpeedTestStageStatus?
+  singleUploadBytes        Int?
+  singleUploadDurationMs   Int?
+  singleUploadStatus       SpeedTestStageStatus?
+  multiUploadBytes         Int?
+  multiUploadDurationMs    Int?
+  multiUploadConcurrency   Int?
+  multiUploadStatus        SpeedTestStageStatus?
+  /// JSON string array of SpeedTestStage. Null = unknown (legacy). Never store secrets.
+  skippedStages        Json?
+  errorCode            String?
+  errorMessage         String?
+  /// True only after a future real Runtime + Mihomo + SpeedTestServer proof.
+  /// Fake fixtures must remain isDemo=true even if this is set in tests.
+  exitVerified         Boolean?
+  /// sha256 identity hashes. Internal only — public mappers/APIs must omit them.
+  directIdentityHash   String?
+  proxiedIdentityHash  String?
   singleThread         Boolean   @default(false)
   /// Measurement timestamp. Maps to the product field measuredAt.
   testedAt             DateTime  @default(now())

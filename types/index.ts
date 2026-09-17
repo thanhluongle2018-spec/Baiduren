@@ -12,6 +12,20 @@ export type SpeedTestStatus =
   | "CANCELLED";
 export type SpeedTestMode = "SINGLE_THREAD" | "MULTI_THREAD";
 export type ReviewStatus = "PENDING" | "PUBLISHED" | "HIDDEN";
+export type SpeedTestStage =
+  | "LATENCY"
+  | "PACKET_LOSS"
+  | "SINGLE_DOWNLOAD"
+  | "MULTI_DOWNLOAD"
+  | "SINGLE_UPLOAD"
+  | "MULTI_UPLOAD"
+  | "COMPLETE";
+export type SpeedTestStageStatus =
+  | "SUCCESS"
+  | "PARTIAL"
+  | "TIMEOUT"
+  | "FAILED"
+  | "SKIPPED";
 
 export type CategorySummary = {
   id: string;
@@ -75,6 +89,33 @@ export type SpeedTestResultView = {
   testedAt: string;
   measuredAt: string;
   isDemo: boolean;
+  latencyAvgMs: number | null;
+  latencyP50Ms: number | null;
+  latencyP90Ms: number | null;
+  latencyAttempts: number | null;
+  latencySuccessCount: number | null;
+  packetLossTotal: number | null;
+  packetLossSuccess: number | null;
+  successRateTotal: number | null;
+  successRateSuccess: number | null;
+  singleDownloadBytes: number | null;
+  singleDownloadDurationMs: number | null;
+  singleDownloadStatus: SpeedTestStageStatus | null;
+  multiDownloadBytes: number | null;
+  multiDownloadDurationMs: number | null;
+  multiDownloadConcurrency: number | null;
+  multiDownloadStatus: SpeedTestStageStatus | null;
+  singleUploadBytes: number | null;
+  singleUploadDurationMs: number | null;
+  singleUploadStatus: SpeedTestStageStatus | null;
+  multiUploadBytes: number | null;
+  multiUploadDurationMs: number | null;
+  multiUploadConcurrency: number | null;
+  multiUploadStatus: SpeedTestStageStatus | null;
+  skippedStages: SpeedTestStage[] | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  exitVerified: boolean | null;
 };
 
 export type SpeedTestRecord = {
@@ -95,6 +136,22 @@ export type SpeedTestRecord = {
   errorMessage: string | null;
   isDemo: boolean;
   result: SpeedTestResultView | null;
+  testVersion?: string | null;
+  currentStage?: SpeedTestStage | null;
+  errorCode?: string | null;
+  latencyAttempts?: number | null;
+  pingTimeoutMs?: number | null;
+  downloadConcurrency?: number | null;
+  uploadConcurrency?: number | null;
+  singleDownloadCapBytes?: number | null;
+  multiDownloadCapBytes?: number | null;
+  singleUploadCapBytes?: number | null;
+  multiUploadCapBytes?: number | null;
+  totalTrafficCapBytes?: number | null;
+  serverMaxConcurrencySnapshot?: number | null;
+  serverBandwidthMbpsSnapshot?: number | null;
+  nodeConcurrencySnapshot?: number | null;
+  airportConcurrencySnapshot?: number | null;
 };
 
 export type ReviewRecord = {
