@@ -229,3 +229,31 @@ NormalizedNode
 - 输入超过 512KiB 会被拒绝
 
 `regionHint` 只根据节点名称推断（HK / JP / US / TW / SG / UNKNOWN），不是真实 IP 地理位置。
+
+Clash YAML 里的 `https` 会标准化为协议 `http`，并保留 `tls: true`。Runtime 不能把它当成明文 HTTP 代理。
+
+## 代理运行时（第三阶段 B-2）
+
+本阶段建立 Worker 后续可调用的 Proxy Runtime，**不进行下载/上传/多线程测速，不改 Mock Executor，不接入真实评分**。
+
+```
+start ProxyRuntime
+        ↓
+localhost mixed-port（仅 127.0.0.1）
+        ↓
+healthCheck
+        ↓
+受控连通性验证（HTTP via proxy）
+        ↓
+stop + 删除临时配置
+```
+
+实现：
+
+- 抽象：`lib/proxy-runtime/`（`start` / `stop` / `getProxyEndpoint` / `healthCheck`）
+- 真实核心适配：`MihomoProcessRuntime`（需要本机 `mihomo`/`clash-meta` 或 `BAIDUREN_MIHOMO_BIN`）
+- 测试夹具：`FakeProxyRuntime` + `tests/helpers/stub-mihomo.mjs`
+
+当前默认开发环境**没有预装 Mihomo/Xray**。自动化测试用 Fake Runtime 和 stub 子进程验证生命周期与「请求经过 proxy」。没有真实机场节点、没有真实订阅拉取。
+
+设置 `BAIDUREN_MIHOMO_BIN` 指向本机 Mihomo 后，ProcessRuntime 才会启动真实核心。在完成环境验证之前，不能把 Fake/stub 结果当成真实机场代理已经跑通。

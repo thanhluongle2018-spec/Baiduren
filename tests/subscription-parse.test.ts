@@ -102,6 +102,22 @@ test("YAML proxies 解析常见 Clash 协议", () => {
   assert.equal(byProtocol.ss.rawConfig.password, SS_PASSWORD);
 });
 
+test("Clash https 节点保留 TLS，不会当成明文 HTTP", () => {
+  const result = parseSubscriptionContent(`proxies:
+  - name: HTTPS 入口
+    type: https
+    server: https-proxy.example.invalid
+    port: 443
+    username: fake-user
+    password: ${SS_PASSWORD}
+`);
+  assert.equal(result.nodes.length, 1);
+  assert.equal(result.nodes[0].protocol, "http");
+  assert.equal(result.nodes[0].metadata.security, "tls");
+  assert.equal(result.nodes[0].rawConfig.tls, true);
+  assert.equal(result.nodes[0].rawConfig.type, "http");
+});
+
 test("空 proxies 返回零节点", () => {
   const result = parseSubscriptionContent("proxies: []\n");
   assert.equal(result.nodes.length, 0);

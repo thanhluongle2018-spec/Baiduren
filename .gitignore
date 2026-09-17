@@ -47,3 +47,6 @@ next-env.d.ts
 
 # local agent scratch files
 /agent-tools/
+
+# proxy runtime temp dirs if accidentally created in-repo
+/baiduren-runtime-*/

@@ -125,6 +125,9 @@ function fromClashProxy(proxy: Record<string, unknown>): NormalizedNode | ParseI
       server,
       port,
       uuid,
+      // Clash `https` is an HTTP proxy with TLS. Keep tls so Runtime does not
+      // treat it as plaintext HTTP.
+      ...(security === "tls" || originalType === "https" ? { tls: true } : {}),
     },
     metadata: {
       network,
