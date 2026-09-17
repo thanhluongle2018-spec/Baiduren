@@ -3,13 +3,13 @@ import { getAirportRanking } from "@/lib/data/ranking";
 import type { ApiListResponse } from "@/types/api";
 import type { RankingRow } from "@/types";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
-  const data = await getAirportRanking();
+  const payload = await getAirportRanking();
   const body: ApiListResponse<RankingRow[]> = {
-    demo: true,
-    source: "demo",
+    ...payload,
     generatedAt: new Date().toISOString(),
-    data,
   };
   return NextResponse.json(body);
 }

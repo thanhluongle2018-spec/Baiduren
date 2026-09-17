@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
-import { announcements } from "@/lib/demo-data";
+import { listAnnouncements } from "@/lib/data/content";
 import type { ApiListResponse } from "@/types/api";
 import type { AnnouncementRecord } from "@/types";
 
-export function GET() {
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const payload = await listAnnouncements();
   const body: ApiListResponse<AnnouncementRecord[]> = {
-    demo: true,
-    source: "demo",
+    ...payload,
     generatedAt: new Date().toISOString(),
-    data: announcements,
   };
   return NextResponse.json(body);
 }

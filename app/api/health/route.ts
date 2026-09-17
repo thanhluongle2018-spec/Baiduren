@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
+import { pingDatabase } from "@/lib/prisma";
 
-export function GET() {
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const database = await pingDatabase();
   return NextResponse.json({
-    ok: true,
+    ok: database === "connected",
     service: "baiduren",
-    demo: true,
+    database,
   });
 }

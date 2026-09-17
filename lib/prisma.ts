@@ -21,3 +21,23 @@ export function getPrisma() {
   }
   return globalForPrisma.prisma;
 }
+
+export async function pingDatabase(): Promise<"connected" | "unavailable"> {
+  try {
+    const prisma = getPrisma();
+    await prisma.$queryRaw`SELECT 1`;
+    return "connected";
+  } catch {
+    return "unavailable";
+  }
+}
+
+export async function withPrisma<T>(
+  fn: (prisma: PrismaClient) => Promise<T>
+): Promise<T | null> {
+  try {
+    return await fn(getPrisma());
+  } catch {
+    return null;
+  }
+}

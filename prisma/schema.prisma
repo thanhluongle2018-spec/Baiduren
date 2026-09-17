@@ -73,7 +73,9 @@ model Airport {
   logoUrl     String?
   websiteUrl  String?
   status      ContentStatus @default(DRAFT)
+  /// Stored reference score only. Composite ranking algorithm is not locked in this phase.
   score       Decimal?      @db.Decimal(4, 2)
+  isDemo      Boolean       @default(false)
   categoryId  String?
   category    Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   createdAt   DateTime      @default(now())
@@ -87,8 +89,10 @@ model Airport {
 
   @@index([status, score])
   @@index([categoryId])
+  @@index([isDemo, status])
 }
 
+/// Plan table. billingCycle maps to billingPeriod; trafficGb maps to traffic.
 model AirportPlan {
   id           String        @id @default(cuid())
   airportId    String
@@ -98,9 +102,11 @@ model AirportPlan {
   currency     String        @default("CNY")
   billingCycle String
   trafficGb    Int?
+  description  String?
   deviceLimit  Int?
   features     String[]
   status       ContentStatus @default(ACTIVE)
+  isDemo       Boolean       @default(false)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -115,6 +121,7 @@ model Node {
   region     String
   kind       String
   status     ContentStatus @default(ACTIVE)
+  isDemo     Boolean       @default(false)
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
   speedTests SpeedTest[]
@@ -149,8 +156,10 @@ model SpeedTest {
   mode         SpeedTestMode    @default(SINGLE_THREAD)
   region       String
   startedAt    DateTime?
+  /// Completion time. Maps to the product field completedAt.
   finishedAt   DateTime?
   errorMessage String?
+  isDemo       Boolean          @default(false)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   result       SpeedTestResult?
@@ -171,6 +180,8 @@ model SpeedTestResult {
   packetLoss   Decimal?  @db.Decimal(5, 2)
   successRate  Decimal?  @db.Decimal(5, 2)
   stability    Decimal?  @db.Decimal(5, 2)
+  singleThread Boolean   @default(false)
+  /// Measurement timestamp. Maps to the product field measuredAt.
   testedAt     DateTime  @default(now())
   createdAt    DateTime  @default(now())
 }
@@ -181,10 +192,12 @@ model Review {
   airport   Airport      @relation(fields: [airportId], references: [id], onDelete: Cascade)
   userId    String?
   user      User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// Integer 1–5.
   rating    Int
   title     String?
   content   String
   status    ReviewStatus @default(PENDING)
+  isDemo    Boolean      @default(false)
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
@@ -199,12 +212,16 @@ model Promotion {
   name         String
   affiliateUrl String
   couponCode   String?
+  clickCount   Int              @default(0)
+  enabled      Boolean          @default(false)
   status       ContentStatus    @default(DRAFT)
+  isDemo       Boolean          @default(false)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   clicks       PromotionClick[]
 
   @@index([airportId, status])
+  @@index([enabled])
 }
 
 model PromotionClick {
@@ -225,6 +242,7 @@ model Announcement {
   content     String
   status      ContentStatus @default(DRAFT)
   publishedAt DateTime?
+  isDemo      Boolean       @default(false)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 

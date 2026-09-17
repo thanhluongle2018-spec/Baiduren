@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
-import { reviews } from "@/lib/demo-data";
+import { listReviews } from "@/lib/data/content";
 import type { ApiListResponse } from "@/types/api";
 import type { ReviewRecord } from "@/types";
 
-export function GET() {
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const payload = await listReviews();
   const body: ApiListResponse<ReviewRecord[]> = {
-    demo: true,
-    source: "demo",
+    ...payload,
     generatedAt: new Date().toISOString(),
-    data: reviews,
   };
   return NextResponse.json(body);
 }

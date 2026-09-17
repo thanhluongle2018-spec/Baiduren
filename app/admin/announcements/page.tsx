@@ -8,19 +8,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { announcements } from "@/lib/demo-data";
+import { listAnnouncements } from "@/lib/data/content";
 import { formatDateTime } from "@/lib/format";
 
 export const metadata: Metadata = {
   title: "公告管理",
 };
 
-export default function AdminAnnouncementsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function AdminAnnouncementsPage() {
+  const payload = await listAnnouncements();
+
   return (
     <div>
       <AdminPageHeader
         title="Announcement 管理"
-        description="占位列表。后续可在此发布站点公告。"
+        description="只读列表。发布与编辑仍待后续阶段。"
       />
       <Table>
         <TableHeader>
@@ -31,7 +35,7 @@ export default function AdminAnnouncementsPage() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {announcements.map((item) => (
+          {payload.data.map((item) => (
             <TableRow key={item.id}>
               <TableCell>{item.title}</TableCell>
               <TableCell>{item.status}</TableCell>

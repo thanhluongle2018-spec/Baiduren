@@ -1,13 +1,15 @@
 import type { DataMode } from "@/types";
 
-export type ApiListResponse<T> = {
-  demo: true;
+export type DataPayload<T> = {
+  demo: boolean;
   source: DataMode;
   generatedAt: string;
   data: T;
 };
 
+export type ApiListResponse<T> = DataPayload<T>;
+
 export type ApiErrorResponse = {
-  demo: true;
+  demo: boolean;
   error: string;
 };

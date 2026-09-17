@@ -8,18 +8,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { promotions } from "@/lib/demo-data";
+import { listPromotions } from "@/lib/data/content";
 
 export const metadata: Metadata = {
   title: "推广管理",
 };
 
-export default function AdminPromotionsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function AdminPromotionsPage() {
+  const payload = await listPromotions();
+
   return (
     <div>
       <AdminPageHeader
         title="Promotion 管理"
-        description="占位列表。推广链接与点击记录将写入 Promotion / PromotionClick，当前不跳转真实联盟接口。"
+        description="只读列表。当前不跳转真实联盟接口。"
       />
       <Table>
         <TableHeader>
@@ -31,7 +35,7 @@ export default function AdminPromotionsPage() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {promotions.map((promotion) => (
+          {payload.data.map((promotion) => (
             <TableRow key={promotion.id}>
               <TableCell>{promotion.airportName}</TableCell>
               <TableCell>{promotion.name}</TableCell>

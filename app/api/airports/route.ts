@@ -3,13 +3,13 @@ import { listAirports } from "@/lib/data/airports";
 import type { ApiListResponse } from "@/types/api";
 import type { AirportSummary } from "@/types";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
-  const data = await listAirports();
+  const payload = await listAirports();
   const body: ApiListResponse<AirportSummary[]> = {
-    demo: true,
-    source: "demo",
+    ...payload,
     generatedAt: new Date().toISOString(),
-    data,
   };
   return NextResponse.json(body);
 }

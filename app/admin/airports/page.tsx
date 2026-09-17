@@ -8,19 +8,23 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { airports } from "@/lib/demo-data";
+import { listAirports } from "@/lib/data/airports";
 import { formatScore } from "@/lib/format";
 
 export const metadata: Metadata = {
   title: "机场管理",
 };
 
-export default function AdminAirportsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function AdminAirportsPage() {
+  const payload = await listAirports();
+
   return (
     <div>
       <AdminPageHeader
         title="Airport 管理"
-        description="占位列表。后续将改为读取 Prisma Airport 表，并提供创建 / 编辑表单。"
+        description="只读列表。创建 / 编辑仍待后续阶段。"
       />
       <Table>
         <TableHeader>
@@ -32,7 +36,7 @@ export default function AdminAirportsPage() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {airports.map((airport) => (
+          {payload.data.map((airport) => (
             <TableRow key={airport.id}>
               <TableCell>{airport.name}</TableCell>
               <TableCell className="font-mono text-xs">{airport.slug}</TableCell>

@@ -8,18 +8,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { reviews } from "@/lib/demo-data";
+import { listReviews } from "@/lib/data/content";
 
 export const metadata: Metadata = {
   title: "评价管理",
 };
 
-export default function AdminReviewsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function AdminReviewsPage() {
+  const payload = await listReviews();
+
   return (
     <div>
       <AdminPageHeader
         title="Review 管理"
-        description="占位列表。后续可在此审核评价状态：PENDING / PUBLISHED / HIDDEN。"
+        description="只读列表。审核与状态变更仍待后续阶段。"
       />
       <Table>
         <TableHeader>
@@ -31,7 +35,7 @@ export default function AdminReviewsPage() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {reviews.map((review) => (
+          {payload.data.map((review) => (
             <TableRow key={review.id}>
               <TableCell>{review.airportName}</TableCell>
               <TableCell>{review.rating}</TableCell>

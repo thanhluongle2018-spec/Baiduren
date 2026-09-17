@@ -1,6 +1,4 @@
-export const DATA_MODE = "demo" as const;
-
-export type DataMode = typeof DATA_MODE;
+export type DataMode = "demo" | "database";
 
 export type ContentStatus = "DRAFT" | "ACTIVE" | "PAUSED" | "ARCHIVED";
 export type SpeedTestStatus =
@@ -120,6 +118,9 @@ export type RankingRow = {
   score: number;
   latencyMs: number;
   downloadMbps: number;
+  uploadMbps: number;
+  packetLoss: number;
+  successRate: number;
   stability: number;
   priceLabel: string;
   updatedAt: string;

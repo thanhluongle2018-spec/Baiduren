@@ -8,18 +8,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { speedTests } from "@/lib/demo-data";
+import { listSpeedTests } from "@/lib/data/content";
 
 export const metadata: Metadata = {
   title: "测速管理",
 };
 
-export default function AdminSpeedTestsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function AdminSpeedTestsPage() {
+  const payload = await listSpeedTests();
+
   return (
     <div>
       <AdminPageHeader
         title="SpeedTest 管理"
-        description="占位列表。正式测速任务将由 Worker 写入 SpeedTest / SpeedTestResult，后台只做查询与复核。"
+        description="只读列表。正式测速任务仍由后续 Worker 写入。"
       />
       <Table>
         <TableHeader>
@@ -32,7 +36,7 @@ export default function AdminSpeedTestsPage() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {speedTests.map((test) => (
+          {payload.data.map((test) => (
             <TableRow key={test.id}>
               <TableCell className="font-mono text-xs">{test.id}</TableCell>
               <TableCell>{test.airportName}</TableCell>

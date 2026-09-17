@@ -12,6 +12,49 @@ import {
   speedTests,
 } from "../lib/demo-data";
 
+const extraNodes = [
+  {
+    id: "node_dukou_sg",
+    airportId: "ap_dukou",
+    name: "新加坡 02",
+    region: "新加坡",
+    kind: "中转",
+    status: "ACTIVE" as const,
+  },
+  {
+    id: "node_beian_hk",
+    airportId: "ap_beian",
+    name: "香港 02",
+    region: "香港",
+    kind: "中转",
+    status: "ACTIVE" as const,
+  },
+  {
+    id: "node_dengta_jp",
+    airportId: "ap_dengta",
+    name: "东京 02",
+    region: "东京",
+    kind: "直连",
+    status: "ACTIVE" as const,
+  },
+  {
+    id: "node_qingzhou_sg",
+    airportId: "ap_qingzhou",
+    name: "新加坡 02",
+    region: "新加坡",
+    kind: "中转",
+    status: "ACTIVE" as const,
+  },
+  {
+    id: "node_chenfeng_jp",
+    airportId: "ap_chenfeng",
+    name: "东京 02",
+    region: "东京",
+    kind: "中转",
+    status: "ACTIVE" as const,
+  },
+];
+
 function getClient() {
   const url = process.env.DATABASE_URL;
   if (!url) {
@@ -52,6 +95,7 @@ async function main() {
         websiteUrl: airport.websiteUrl,
         status: airport.status,
         score: airport.score,
+        isDemo: true,
         categoryId: category?.id,
       },
       create: {
@@ -63,6 +107,7 @@ async function main() {
         websiteUrl: airport.websiteUrl,
         status: airport.status,
         score: airport.score,
+        isDemo: true,
         categoryId: category?.id,
       },
     });
@@ -76,9 +121,11 @@ async function main() {
         price: plan.price,
         billingCycle: plan.billingCycle,
         trafficGb: plan.trafficGb,
+        description: "演示套餐，非正式售卖。",
         deviceLimit: plan.deviceLimit,
         features: plan.features,
         status: plan.status,
+        isDemo: true,
       },
       create: {
         id: plan.id,
@@ -88,14 +135,16 @@ async function main() {
         currency: plan.currency,
         billingCycle: plan.billingCycle,
         trafficGb: plan.trafficGb,
+        description: "演示套餐，非正式售卖。",
         deviceLimit: plan.deviceLimit,
         features: plan.features,
         status: plan.status,
+        isDemo: true,
       },
     });
   }
 
-  for (const node of nodes) {
+  for (const node of [...nodes, ...extraNodes]) {
     await prisma.node.upsert({
       where: { id: node.id },
       update: {
@@ -103,6 +152,7 @@ async function main() {
         region: node.region,
         kind: node.kind,
         status: node.status,
+        isDemo: true,
       },
       create: {
         id: node.id,
@@ -111,11 +161,12 @@ async function main() {
         region: node.region,
         kind: node.kind,
         status: node.status,
+        isDemo: true,
       },
     });
   }
 
-  const demoServer = await prisma.speedTestServer.upsert({
+  const shanghai = await prisma.speedTestServer.upsert({
     where: { id: "srv_demo_shanghai" },
     update: { name: "演示测速点 · 上海", region: "上海", status: "DRAFT" },
     create: {
@@ -126,7 +177,19 @@ async function main() {
     },
   });
 
+  const guangzhou = await prisma.speedTestServer.upsert({
+    where: { id: "srv_demo_guangzhou" },
+    update: { name: "演示测速点 · 广州", region: "广州", status: "DRAFT" },
+    create: {
+      id: "srv_demo_guangzhou",
+      name: "演示测速点 · 广州",
+      region: "广州",
+      status: "DRAFT",
+    },
+  });
+
   for (const test of speedTests) {
+    const serverId = test.region === "广州" ? guangzhou.id : shanghai.id;
     await prisma.speedTest.upsert({
       where: { id: test.id },
       update: {
@@ -135,17 +198,20 @@ async function main() {
         region: test.region,
         startedAt: test.startedAt,
         finishedAt: test.finishedAt,
+        isDemo: true,
+        serverId,
       },
       create: {
         id: test.id,
         airportId: test.airportId,
         nodeId: test.nodeId,
-        serverId: demoServer.id,
+        serverId,
         status: test.status,
         mode: test.mode,
         region: test.region,
         startedAt: test.startedAt,
         finishedAt: test.finishedAt,
+        isDemo: true,
       },
     });
 
@@ -158,6 +224,7 @@ async function main() {
         packetLoss: test.result.packetLoss,
         successRate: test.result.successRate,
         stability: test.result.stability,
+        singleThread: test.mode === "SINGLE_THREAD",
         testedAt: test.result.testedAt,
       },
       create: {
@@ -168,6 +235,7 @@ async function main() {
         packetLoss: test.result.packetLoss,
         successRate: test.result.successRate,
         stability: test.result.stability,
+        singleThread: test.mode === "SINGLE_THREAD",
         testedAt: test.result.testedAt,
       },
     });
@@ -181,6 +249,7 @@ async function main() {
         title: review.title,
         content: review.content,
         status: review.status,
+        isDemo: true,
       },
       create: {
         id: review.id,
@@ -189,6 +258,7 @@ async function main() {
         title: review.title,
         content: review.content,
         status: review.status,
+        isDemo: true,
       },
     });
   }
@@ -201,6 +271,9 @@ async function main() {
         affiliateUrl: promotion.affiliateUrl,
         couponCode: promotion.couponCode,
         status: promotion.status,
+        clickCount: 0,
+        enabled: false,
+        isDemo: true,
       },
       create: {
         id: promotion.id,
@@ -209,6 +282,9 @@ async function main() {
         affiliateUrl: promotion.affiliateUrl,
         couponCode: promotion.couponCode,
         status: promotion.status,
+        clickCount: 0,
+        enabled: false,
+        isDemo: true,
       },
     });
   }
@@ -217,17 +293,21 @@ async function main() {
     await prisma.announcement.upsert({
       where: { id: announcement.id },
       update: {
-        title: announcement.title,
-        content: announcement.content,
+        title: "第二阶段：数据库演示 seed",
+        content:
+          "当前库内记录均为明确标记的演示数据（isDemo=true）。清空数据库后，网站会回退到内存演示数据。",
         status: announcement.status,
         publishedAt: announcement.publishedAt,
+        isDemo: true,
       },
       create: {
         id: announcement.id,
-        title: announcement.title,
-        content: announcement.content,
+        title: "第二阶段：数据库演示 seed",
+        content:
+          "当前库内记录均为明确标记的演示数据（isDemo=true）。清空数据库后，网站会回退到内存演示数据。",
         status: announcement.status,
         publishedAt: announcement.publishedAt,
+        isDemo: true,
       },
     });
   }
@@ -235,7 +315,7 @@ async function main() {
   await prisma.$disconnect();
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   console.error(error);
   process.exit(1);
 });

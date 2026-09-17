@@ -28,25 +28,29 @@ type AirportPageProps = {
   params: Promise<{ slug: string }>;
 };
 
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({
   params,
 }: AirportPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const airport = await getAirportDetail(slug);
-  if (!airport) {
+  const payload = await getAirportDetail(slug);
+  if (!payload.data) {
     return { title: "机场未找到" };
   }
-  return { title: airport.name };
+  return { title: payload.data.name };
 }
 
 export default async function AirportDetailPage({ params }: AirportPageProps) {
   const { slug } = await params;
-  const airport = await getAirportDetail(slug);
+  const payload = await getAirportDetail(slug);
+  const airport = payload.data;
   if (!airport) {
     notFound();
   }
 
   const latest = airport.speedTests[0];
+  const metricHint = payload.demo ? "演示测速" : "最近测速";
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
@@ -56,9 +60,11 @@ export default async function AirportDetailPage({ params }: AirportPageProps) {
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight">{airport.name}</h1>
             <Badge variant="secondary">{airport.categoryName}</Badge>
-            <Badge variant="outline" className="border-amber-300 text-amber-800">
-              演示数据
-            </Badge>
+            {payload.demo ? (
+              <Badge variant="outline" className="border-amber-300 text-amber-800">
+                演示数据
+              </Badge>
+            ) : null}
           </div>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
             {airport.description}
@@ -66,26 +72,32 @@ export default async function AirportDetailPage({ params }: AirportPageProps) {
         </div>
       </div>
 
-      <div className="mt-4">
-        <DemoBanner />
-      </div>
+      {payload.demo ? (
+        <div className="mt-4">
+          <DemoBanner />
+        </div>
+      ) : null}
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="综合评分" value={formatScore(airport.score)} hint="演示评分" />
+        <StatCard
+          label="参考评分"
+          value={formatScore(airport.score)}
+          hint="非最终算法"
+        />
         <StatCard
           label="延迟"
           value={latest ? formatLatency(latest.result.latencyMs) : "—"}
-          hint="演示测速"
+          hint={metricHint}
         />
         <StatCard
           label="下载速度"
           value={latest ? formatSpeed(latest.result.downloadMbps) : "—"}
-          hint="演示测速"
+          hint={metricHint}
         />
         <StatCard
           label="稳定性"
           value={latest ? formatPercent(latest.result.stability) : "—"}
-          hint="演示测速"
+          hint={metricHint}
         />
       </div>
 
@@ -113,9 +125,7 @@ export default async function AirportDetailPage({ params }: AirportPageProps) {
                     <TableCell>{node.name}</TableCell>
                     <TableCell>{node.region}</TableCell>
                     <TableCell>{node.kind}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">演示</Badge>
-                    </TableCell>
+                    <TableCell>{node.status}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -145,8 +155,8 @@ export default async function AirportDetailPage({ params }: AirportPageProps) {
               <CardTitle>推广位</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              推广链接保存在 Promotion 表中，当前不展示真实跳转。示例地址为
-              example.com 占位。
+              推广记录保存在 Promotion 表中。当前不展示真实跳转，affiliateUrl
+              仅为 example.com 占位。
             </CardContent>
           </Card>
         </section>

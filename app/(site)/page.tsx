@@ -7,12 +7,24 @@ import { StatCard } from "@/components/stat-card";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { siteConfig } from "@/lib/config";
-import { airports, speedTests } from "@/lib/demo-data";
+import { listAirports } from "@/lib/data/airports";
+import { listSpeedTests } from "@/lib/data/content";
 import { getRankingPreview } from "@/lib/data/ranking";
+
+export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const rankingPreview = await getRankingPreview(5);
-  const popularAirports = airports.slice(0, 4);
+  const airportList = await listAirports();
+  const latestTests = await listSpeedTests();
+  const popularAirports = airportList.data.slice(0, 4);
+  const sourceLabel = rankingPreview.source === "database" ? "Database" : "Demo";
+  const sourceHint =
+    rankingPreview.source === "database"
+      ? rankingPreview.demo
+        ? "PostgreSQL 演示 seed"
+        : "PostgreSQL 正式数据"
+      : "内存演示数据";
 
   return (
     <div>
@@ -26,8 +38,8 @@ export default async function HomePage() {
               {siteConfig.tagline}
             </h1>
             <p className="mt-4 max-w-xl text-sm leading-7 text-muted-foreground sm:text-base">
-              用可核对的测速字段评估机场表现。第一阶段先搭好网站、数据模型与页面骨架；
-              真实测速由后续独立 Worker / Agent 写入数据库，再汇总到排行榜。
+              用可核对的测速字段评估机场表现。本阶段已接入 PostgreSQL + Prisma；
+              真实测速仍由后续独立 Worker / Agent 写入数据库，再汇总到排行榜。
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link href="/ranking" className={buttonVariants()}>
@@ -46,9 +58,13 @@ export default async function HomePage() {
               <CardTitle>数据说明</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
-              <DemoBanner message="首页、排行榜与详情页均使用演示数据，便于核对字段，不是实测结果。" />
+              {rankingPreview.demo ? (
+                <DemoBanner message="当前展示演示数据。数据库有正式机场后将自动切换。" />
+              ) : (
+                <p>当前列表来自 PostgreSQL，测速指标由 SpeedTestResult 聚合，综合评分算法尚未定稿。</p>
+              )}
               <p>
-                后续链路：测速服务器 → 测速任务 → 执行测速 → 写入 SpeedTest /
+                数据链路：测速服务器 → 测速任务 → 执行测速 → 写入 SpeedTest /
                 SpeedTestResult → 排行榜聚合。
               </p>
             </CardContent>
@@ -59,20 +75,16 @@ export default async function HomePage() {
       <section className="mx-auto max-w-6xl px-4 py-8">
         <div className="grid gap-3 sm:grid-cols-3">
           <StatCard
-            label="演示机场"
-            value={String(airports.length)}
-            hint="虚构样本，非真实接入"
+            label="机场"
+            value={String(airportList.data.length)}
+            hint={airportList.demo ? "演示或 seed 样本" : "数据库记录"}
           />
           <StatCard
-            label="演示测速记录"
-            value={String(speedTests.length)}
-            hint="占位指标，待 Worker 替换"
+            label="测速记录"
+            value={String(latestTests.data.length)}
+            hint="完成态 SpeedTestResult"
           />
-          <StatCard
-            label="数据来源"
-            value="Demo"
-            hint="lib/demo-data.ts"
-          />
+          <StatCard label="数据来源" value={sourceLabel} hint={sourceHint} />
         </div>
       </section>
 
@@ -81,7 +93,7 @@ export default async function HomePage() {
           <div>
             <h2 className="text-lg font-semibold tracking-tight">排行榜预览</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              结构与正式排行榜一致，方便以后替换数据源。
+              延迟、下载、上传等为测速结果平均值；综合评分本阶段仅作参考字段。
             </p>
           </div>
           <Link href="/ranking" className={buttonVariants({ variant: "outline", size: "sm" })}>
@@ -90,7 +102,7 @@ export default async function HomePage() {
         </div>
         <Card>
           <CardContent className="pt-4">
-            <RankingTable rows={rankingPreview} compact />
+            <RankingTable rows={rankingPreview.data} compact demo={rankingPreview.demo} />
           </CardContent>
         </Card>
       </section>
@@ -98,7 +110,7 @@ export default async function HomePage() {
       <section className="mx-auto max-w-6xl px-4 py-6">
         <h2 className="text-lg font-semibold tracking-tight">热门机场</h2>
         <p className="mt-1 mb-4 text-sm text-muted-foreground">
-          演示样本，用于核对卡片布局。
+          来自当前数据源的前四条机场。
         </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {popularAirports.map((airport) => (
@@ -110,11 +122,11 @@ export default async function HomePage() {
       <section className="mx-auto max-w-6xl px-4 py-6">
         <h2 className="text-lg font-semibold tracking-tight">最新测速</h2>
         <p className="mt-1 mb-4 text-sm text-muted-foreground">
-          以下数值为演示占位，包含延迟、下载速度、稳定性等字段。
+          完成态测速记录，含延迟、下载速度、稳定性等字段。
         </p>
         <Card>
           <CardContent className="pt-4">
-            <SpeedTestList records={speedTests} />
+            <SpeedTestList records={latestTests.data} />
           </CardContent>
         </Card>
       </section>
@@ -131,11 +143,11 @@ export default async function HomePage() {
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>第一阶段范围</CardTitle>
+              <CardTitle>第二阶段范围</CardTitle>
             </CardHeader>
             <CardContent className="text-sm leading-7 text-muted-foreground">
-              已完成项目骨架、Prisma 模型、基础 API、首页 / 排行榜 / 机场详情 /
-              后台占位。未接入真实机场、真实节点或第三方测速 API。
+              已接入 PostgreSQL + Prisma。页面优先读库，库空或不可用时回退演示数据。
+              尚未开发真实测速 Worker、管理员登录与后台 CRUD。
             </CardContent>
           </Card>
         </div>
