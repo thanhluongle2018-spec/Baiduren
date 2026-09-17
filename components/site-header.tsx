@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { siteConfig } from "@/lib/config";
 
 const navItems = [
@@ -43,15 +43,15 @@ export function SiteHeader() {
             </Link>
           ))}
         </nav>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="md:hidden"
+        <button
+          type="button"
+          className={buttonVariants({ variant: "ghost", size: "icon" }) + " md:hidden"}
           onClick={() => setOpen((value) => !value)}
           aria-label={open ? "关闭菜单" : "打开菜单"}
+          aria-expanded={open}
         >
           {open ? <X /> : <Menu />}
-        </Button>
+        </button>
       </div>
       {open ? (
         <nav className="border-t px-4 py-3 md:hidden">
