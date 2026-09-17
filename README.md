@@ -2,8 +2,9 @@
 
 机场测评、节点测速与数据排行榜网站。
 
-当前为第三阶段 A：测速任务、Worker、模拟执行器与排行榜聚合已经接通。  
-**页面上的测速结果和用户评价均为演示数据，不是真实测量或真实评价。本阶段不会探测真实机场或代理节点。**
+当前为第三阶段 B-1：机场订阅内容可以解析为统一节点，并写入现有 `Node` 表。
+第三阶段 A 的测速任务、Worker、模拟执行器与排行榜聚合仍然可用。
+**页面上的测速结果和用户评价均为演示数据，不是真实测量或真实评价。本阶段不会探测真实机场、不会拉取远程订阅、也不会建立代理连接。**
 
 定位文案：机场测评 · 节点测速 · 数据排行榜
 
@@ -68,7 +69,7 @@ docker compose up -d
 | `npx prisma studio` | 打开数据浏览器 |
 | `npx prisma db seed` | 写入演示数据（需已 migrate） |
 | `npm run worker` | 启动模拟测速 Worker（独立进程） |
-| `npm test` | 状态机 / mock executor / Worker 集成测试 |
+| `npm test` | 状态机 / mock executor / Worker / 订阅解析测试 |
 
 Prisma 配置在 `prisma.config.ts`，模型在 `prisma/schema.prisma`。  
 应用代码通过 `lib/prisma.ts` 的 `getPrisma()` 懒加载客户端。页面优先读库，库空或不可用时回退内存演示数据。
@@ -195,3 +196,36 @@ SpeedTestResult + SpeedTest SUCCESS/FAILED
 - `POST /api/speed-tests`（只创建 demo/mock 任务，拒绝真实测速）
 - `GET /api/reviews`
 - `GET /api/announcements`
+- `POST /api/airports/[slug]/nodes/parse`（传入订阅内容，解析并 upsert 节点；不返回凭据或 rawConfig）
+
+## 订阅解析（第三阶段 B-1）
+
+本阶段只做「解析和标准化」，不执行代理、不测速、不评分。
+
+```
+订阅内容（YAML / URI / base64 URI 列表）
+        ↓
+Clash / Mihomo / URI 解析
+        ↓
+NormalizedNode
+        ↓
+按 fingerprint upsert Node（消失节点 PAUSED，不物理删除）
+```
+
+支持的输入：
+
+- Clash / Mihomo YAML 的 `proxies`
+- base64 编码的代理 URI 列表
+- 单个 `ss://` `vmess://` `trojan://` `vless://`
+
+支持的协议：`ss`、`vmess`、`trojan`、`vless`、`socks5`、`http`。
+无法安全标准化的类型返回 `UNSUPPORTED_PROTOCOL`，不会伪造节点。
+
+安全边界：
+
+- 不实现 HTTP 拉取订阅，因此没有 SSRF 面
+- `rawConfig` 只存数据库，不出现在普通 GET/POST 响应
+- 日志和错误信息不包含 password / uuid / token / 完整订阅 URL
+- 输入超过 512KiB 会被拒绝
+
+`regionHint` 只根据节点名称推断（HK / JP / US / TW / SG / UNKNOWN），不是真实 IP 地理位置。

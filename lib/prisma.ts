@@ -25,6 +25,10 @@ export function getPrisma() {
   return globalForPrisma.prisma;
 }
 
+export function resetPrismaForTests() {
+  globalForPrisma.prisma = undefined;
+}
+
 export async function pingDatabase(): Promise<"connected" | "unavailable"> {
   try {
     const prisma = getPrisma();

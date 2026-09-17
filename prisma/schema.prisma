@@ -1,4 +1,4 @@
-// 摆渡人 data model — phase 3A SpeedTest architecture (mock executor only).
+// 摆渡人 data model — phase 3B-1 subscription parse + phase 3A mock speedtest.
 // Real node probing, proxy connections, and public scans are out of scope.
 
 generator client {
@@ -130,11 +130,24 @@ model Node {
   kind       String
   status     ContentStatus @default(ACTIVE)
   isDemo     Boolean       @default(false)
+  /// Clash/Mihomo protocol after normalization. Null for legacy demo rows.
+  protocol   String?
+  server     String?
+  port       Int?
+  /// Name-inferred region code. Not a real IP geolocation.
+  regionHint String?
+  sourceFormat String?
+  /// sha256 identity. Unique per airport when present. Never stores raw secrets.
+  fingerprint String?
+  /// Original proxy config for a future runtime. Never expose via public APIs.
+  rawConfig   String?
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
   speedTests SpeedTest[]
 
   @@index([airportId, region])
+  @@index([airportId, status])
+  @@unique([airportId, fingerprint])
 }
 
 /// Independent speed-test servers / agents. Demo identifiers only — no real IPs.
