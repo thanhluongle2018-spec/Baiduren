@@ -19,6 +19,8 @@ export type FakeSpeedTestServerOptions = {
   failDownloadNth?: number;
   failPingNth?: number;
   failUploadNth?: number;
+  /** Test-only: both direct and proxied whoami return the same fixture identity. */
+  identicalWhoami?: boolean;
 };
 
 export type FakeWhoami = {
@@ -181,7 +183,8 @@ export class FakeSpeedTestServer {
   private whoamiBody(req: http.IncomingMessage): FakeWhoami {
     const header = req.headers[VIA_HEADER];
     const via = Array.isArray(header) ? header[0] : header ?? null;
-    const proxied = typeof via === "string" && via.length > 0;
+    const proxied =
+      !this.options.identicalWhoami && typeof via === "string" && via.length > 0;
     return {
       isDemo: true,
       fixture: true,
