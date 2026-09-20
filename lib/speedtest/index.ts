@@ -14,6 +14,8 @@ export type {
 } from "@/lib/speedtest/types";
 export { speedTestClient, StubSpeedTestClient } from "@/lib/speedtest/client";
 export { createSpeedTestJob } from "@/lib/speedtest/jobs";
+export { buildJobParamSnapshot, totalTrafficCapBytes } from "@/lib/speedtest/job-params";
+export type { SpeedTestJobParamSnapshot } from "@/lib/speedtest/job-params";
 export { PrismaSpeedTestJobQueue } from "@/lib/speedtest/prisma-queue";
 export {
   claimNextPendingJob,

@@ -6,6 +6,7 @@ import {
   MIN_CONCURRENCY,
 } from "@/lib/speedtest/constants";
 import { SpeedTestJobError } from "@/lib/speedtest/errors";
+import { buildJobParamSnapshot } from "@/lib/speedtest/job-params";
 import type { CreateSpeedTestJobInput } from "@/lib/speedtest/types";
 
 function parseConcurrency(value: number | undefined) {
@@ -46,6 +47,14 @@ export async function createSpeedTestJob(
       throw new SpeedTestJobError("SERVER_DISABLED");
     }
 
+    const snapshot = buildJobParamSnapshot({
+      concurrency,
+      airportMaxConcurrentTests: airport.maxConcurrentTests,
+      nodeMaxConcurrentTests: node.maxConcurrentTests,
+      serverMaxConcurrentTests: server.maxConcurrentTests,
+      serverBandwidthMbps: server.bandwidthMbps,
+    });
+
     const job = await prisma.speedTest.create({
       data: {
         airportId: airport.id,
@@ -56,6 +65,7 @@ export async function createSpeedTestJob(
         concurrency,
         region: server.region,
         isDemo,
+        ...snapshot,
       },
       include: {
         airport: { select: { name: true, slug: true, isDemo: true } },

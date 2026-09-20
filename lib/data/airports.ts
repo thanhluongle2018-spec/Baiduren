@@ -12,13 +12,23 @@ import type { LoadedData } from "@/lib/data/source";
 const airportInclude = {
   category: true,
   plans: { orderBy: { price: "asc" as const } },
-  nodes: { orderBy: { name: "asc" as const } },
+  nodes: {
+    orderBy: { name: "asc" as const },
+    select: {
+      id: true,
+      airportId: true,
+      name: true,
+      region: true,
+      kind: true,
+      status: true,
+    },
+  },
   speedTests: {
     where: { status: { in: SUCCESSFUL_STATUSES }, result: { isNot: null } },
     orderBy: { finishedAt: "desc" as const },
     include: {
       result: true,
-      node: true,
+      node: { select: { name: true } },
       server: true,
       airport: { select: { name: true, slug: true } },
     },
