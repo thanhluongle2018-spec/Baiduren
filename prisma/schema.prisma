@@ -1,4 +1,4 @@
-// 摆渡人 data model — phase 3B-3 raw metrics schema.
+// 摆渡人 data model — phase 1 capacity + sample schema.
 // Real node probing, proxy connections, and public scans remain out of scope.
 
 generator client {
@@ -104,6 +104,8 @@ model Airport {
   /// Stored reference score only. Composite ranking algorithm is not locked in this phase.
   score       Decimal?      @db.Decimal(4, 2)
   isDemo      Boolean       @default(false)
+  /// Max RUNNING jobs for this airport. Must be >= 1. Existing rows default to 1.
+  maxConcurrentTests Int    @default(1)
   categoryId  String?
   category    Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   createdAt   DateTime      @default(now())
@@ -161,6 +163,8 @@ model Node {
   fingerprint String?
   /// Original proxy config for a future runtime. Never expose via public APIs.
   rawConfig   String?
+  /// Max RUNNING jobs for this node. Must be >= 1. Existing rows default to 1.
+  maxConcurrentTests Int   @default(1)
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
   speedTests SpeedTest[]
@@ -179,7 +183,8 @@ model SpeedTestServer {
   city               String
   bandwidthMbps      Int
   maxConcurrentTests Int                    @default(1)
-  /// Optional future callback URL. Never store a real probe target here in this phase.
+  /// Future real speed-test server base URL (whoami/ping/download/upload).
+  /// Do not store a public probe target in this phase. Demo/seed rows stay null.
   endpoint           String?
   status             SpeedTestServerStatus  @default(DISABLED)
   isDemo             Boolean                @default(false)
@@ -229,23 +234,44 @@ model SpeedTest {
   singleUploadCapBytes     Int?
   multiUploadCapBytes      Int?
   totalTrafficCapBytes     Int?
-  /// Snapshots of capacity at test time. Null when the source model has no value.
+  /// Snapshots of capacity at test time. Null on legacy rows created before Phase 1.
   serverMaxConcurrencySnapshot Int?
   serverBandwidthMbpsSnapshot  Int?
-  /// No Node/Airport concurrency field exists yet; left nullable on purpose.
   nodeConcurrencySnapshot      Int?
   airportConcurrencySnapshot   Int?
   isDemo       Boolean           @default(false)
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
   result       SpeedTestResult?
+  samples      SpeedTestSample[]
 
   @@index([airportId, createdAt])
+  @@index([airportId, status])
   @@index([status, createdAt])
   @@index([nodeId])
+  @@index([nodeId, status])
   @@index([serverId])
   @@index([serverId, status])
   @@index([status, leaseExpiresAt])
+}
+
+/// Per-attempt raw samples for a future real executor. Never store secrets, IPs, or bodies.
+model SpeedTestSample {
+  id          String          @id @default(cuid())
+  speedTestId String
+  speedTest   SpeedTest       @relation(fields: [speedTestId], references: [id], onDelete: Cascade)
+  stage       SpeedTestStage
+  seq         Int
+  ok          Boolean
+  bytes       Int?
+  durationMs  Int?
+  statusCode  Int?
+  errorCode   String?
+  startedAt   DateTime
+  createdAt   DateTime        @default(now())
+
+  @@unique([speedTestId, stage, seq])
+  @@index([speedTestId, stage])
 }
 
 model SpeedTestResult {

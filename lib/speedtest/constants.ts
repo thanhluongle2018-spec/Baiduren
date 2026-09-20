@@ -5,6 +5,11 @@ export const MAX_CONCURRENCY = 8;
 export const DEFAULT_CONCURRENCY = 1;
 export const MULTI_THREAD_CONCURRENCY = 4;
 
+/** Snapshot protocol version written on new jobs. Mock execution is unchanged. */
+export const SPEED_TEST_VERSION = "3b3-v1";
+export const DEFAULT_LATENCY_ATTEMPTS = 10;
+export const DEFAULT_PING_TIMEOUT_MS = 2000;
+
 export const SUCCESSFUL_STATUSES: SpeedTestStatus[] = ["SUCCESS", "COMPLETED"];
 
 export const RANKING_WINDOW_MS = 24 * 60 * 60 * 1000;

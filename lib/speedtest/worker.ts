@@ -20,6 +20,8 @@ import type {
 type ClaimRow = {
   id: string;
   serverId: string;
+  airportId: string;
+  nodeId: string | null;
 };
 
 export type ClaimJobOptions = {
@@ -66,8 +68,9 @@ const claimedInclude = {
 /**
  * Claim one PENDING job using a database lock.
  * Concurrent workers cannot receive the same row (FOR UPDATE SKIP LOCKED).
- * Server capacity is re-checked after locking SpeedTestServer so maxConcurrentTests
- * is recovered from PostgreSQL, not from process memory.
+ * Server, airport, and node capacity are re-checked after locking those rows
+ * so maxConcurrentTests is recovered from PostgreSQL, not from process memory.
+ * Worker execution remains one job at a time; this only prevents over-claiming.
  */
 export async function claimNextPendingJob(
   prisma: PrismaClient = getPrisma(),
@@ -81,18 +84,41 @@ export async function claimNextPendingJob(
 
     for (let attempt = 0; attempt < 16; attempt += 1) {
       const candidates = await tx.$queryRaw<ClaimRow[]>`
-        SELECT st.id, st."serverId"
+        SELECT st.id, st."serverId", st."airportId", st."nodeId"
         FROM "SpeedTest" st
         INNER JOIN "SpeedTestServer" srv ON srv.id = st."serverId"
+        INNER JOIN "Airport" ap ON ap.id = st."airportId"
+        LEFT JOIN "Node" nd ON nd.id = st."nodeId"
         WHERE st.status = 'PENDING'::"SpeedTestStatus"
           AND st."serverId" IS NOT NULL
           AND srv.status = 'ACTIVE'::"SpeedTestServerStatus"
+          AND srv."maxConcurrentTests" >= 1
+          AND ap."maxConcurrentTests" >= 1
           AND (
             SELECT COUNT(*)::int
             FROM "SpeedTest" running
             WHERE running."serverId" = st."serverId"
               AND running.status = 'RUNNING'::"SpeedTestStatus"
           ) < srv."maxConcurrentTests"
+          AND (
+            SELECT COUNT(*)::int
+            FROM "SpeedTest" running
+            WHERE running."airportId" = st."airportId"
+              AND running.status = 'RUNNING'::"SpeedTestStatus"
+          ) < ap."maxConcurrentTests"
+          AND (
+            st."nodeId" IS NULL
+            OR (
+              nd.id IS NOT NULL
+              AND nd."maxConcurrentTests" >= 1
+              AND (
+                SELECT COUNT(*)::int
+                FROM "SpeedTest" running
+                WHERE running."nodeId" = st."nodeId"
+                  AND running.status = 'RUNNING'::"SpeedTestStatus"
+              ) < nd."maxConcurrentTests"
+            )
+          )
           ${serverFilter}
           ${skipIdsSql(skippedJobIds)}
         ORDER BY st."createdAt" ASC
@@ -112,17 +138,63 @@ export async function claimNextPendingJob(
         FOR UPDATE
       `;
       const server = servers[0];
-      if (!server || server.status !== "ACTIVE") {
+      if (!server || server.status !== "ACTIVE" || server.maxConcurrentTests < 1) {
         skippedJobIds.push(candidate.id);
         continue;
       }
 
-      const running = await tx.speedTest.count({
+      const serverRunning = await tx.speedTest.count({
         where: { serverId: candidate.serverId, status: "RUNNING" },
       });
-      if (running >= server.maxConcurrentTests) {
+      if (serverRunning >= server.maxConcurrentTests) {
         skippedJobIds.push(candidate.id);
         continue;
+      }
+
+      const airports = await tx.$queryRaw<
+        Array<{ id: string; maxConcurrentTests: number }>
+      >`
+        SELECT id, "maxConcurrentTests"
+        FROM "Airport"
+        WHERE id = ${candidate.airportId}
+        FOR UPDATE
+      `;
+      const airport = airports[0];
+      if (!airport || airport.maxConcurrentTests < 1) {
+        skippedJobIds.push(candidate.id);
+        continue;
+      }
+
+      const airportRunning = await tx.speedTest.count({
+        where: { airportId: candidate.airportId, status: "RUNNING" },
+      });
+      if (airportRunning >= airport.maxConcurrentTests) {
+        skippedJobIds.push(candidate.id);
+        continue;
+      }
+
+      if (candidate.nodeId) {
+        const nodes = await tx.$queryRaw<
+          Array<{ id: string; maxConcurrentTests: number }>
+        >`
+          SELECT id, "maxConcurrentTests"
+          FROM "Node"
+          WHERE id = ${candidate.nodeId}
+          FOR UPDATE
+        `;
+        const node = nodes[0];
+        if (!node || node.maxConcurrentTests < 1) {
+          skippedJobIds.push(candidate.id);
+          continue;
+        }
+
+        const nodeRunning = await tx.speedTest.count({
+          where: { nodeId: candidate.nodeId, status: "RUNNING" },
+        });
+        if (nodeRunning >= node.maxConcurrentTests) {
+          skippedJobIds.push(candidate.id);
+          continue;
+        }
       }
 
       const now = new Date();

@@ -12,7 +12,7 @@ import type { LoadedData } from "@/lib/data/source";
 
 const speedTestInclude = {
   result: true,
-  node: true,
+  node: { select: { name: true } },
   server: true,
   airport: { select: { name: true, slug: true } },
 } as const;
